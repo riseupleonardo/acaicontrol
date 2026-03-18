@@ -92,7 +92,7 @@ function LoginScreen({ usuarios, onLogin }) {
         </div>
         {err && <p style={{ margin:"0 0 14px",fontSize:13,color:"#ef4444",background:"#fef2f2",padding:"8px 12px",borderRadius:8 }}>⚠️ {err}</p>}
         <button style={{ ...S.btn,width:"100%",padding:12,fontSize:15 }} onClick={tentar}>Entrar</button>
-        <p style={{ margin:"16px 0 0",textAlign:"center",fontSize:12,color:"#9ca3af" }}>Acesso padrão: <strong>admin</strong> / <strong>admin123</strong></p>
+
       </div>
     </div>
   );
