@@ -729,7 +729,7 @@ export default function App() {
         {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido}/>}
         {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} estoqueProdutoFn={estoqueProdutoFn}/>}
         {tab===8  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
-        {tab===9  && <DRETab recBruta={recBruta} cmv={cmv} lucBruto={lucBruto} totDesp={totDesp} lucOp={lucOp} mbPct={mbPct} moPct={moPct} despesas={despesas}/>}
+        {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
         {tab===10 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
         {tab===11 && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} currentUser={currentUser}/>}
       </div>
