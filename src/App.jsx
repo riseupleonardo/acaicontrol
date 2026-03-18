@@ -79,7 +79,7 @@ function LoginScreen({ usuarios, onLogin }) {
       <div style={{ background:"white",borderRadius:20,padding:40,width:360,boxShadow:"0 20px 60px rgba(0,0,0,.2)" }}>
         <div style={{ textAlign:"center",marginBottom:28 }}>
           <div style={{ fontSize:56 }}>🫐</div>
-          <h1 style={{ margin:"10px 0 4px",fontSize:24,fontWeight:800,color:"#3730a3" }}>AçaíControl</h1>
+          <h1 style={{ margin:"10px 0 4px",fontSize:24,fontWeight:800,color:"#3730a3" }}>NaGarrafa</h1>
           <p style={{ margin:0,fontSize:13,color:"#9ca3af" }}>Faça login para continuar</p>
         </div>
         <div style={{ marginBottom:14 }}>
@@ -699,7 +699,7 @@ export default function App() {
       <div style={{ background:"linear-gradient(135deg,#6d28d9,#4338ca)",color:"white",padding:"14px 24px",boxShadow:"0 4px 16px rgba(109,40,217,.3)" }}>
         <div style={{ maxWidth:1300,margin:"0 auto",display:"flex",alignItems:"center",gap:12 }}>
           <span style={{ fontSize:36 }}>🫐</span>
-          <div><h1 style={{ margin:0,fontSize:22,fontWeight:800 }}>AçaíControl</h1><p style={{ margin:0,fontSize:12,opacity:.75 }}>Estoque · Custo Médio · Produção · DRE</p></div>
+          <div><h1 style={{ margin:0,fontSize:22,fontWeight:800 }}>NaGarrafa</h1><p style={{ margin:0,fontSize:12,opacity:.75 }}>Estoque · Custo Médio · Produção · DRE</p></div>
           <div style={{ marginLeft:"auto",display:"flex",gap:12,alignItems:"center" }}>
             <div style={{ fontSize:13,opacity:.85,display:"flex",gap:16 }}><span>Receita: <strong>{fR(recBruta)}</strong></span><span style={{ color:lucOp>=0?"#86efac":"#fca5a5" }}>Resultado: <strong>{fR(lucOp)}</strong></span></div>
             <div style={{ display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,.15)",borderRadius:20,padding:"6px 14px" }}>
