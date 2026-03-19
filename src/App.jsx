@@ -858,7 +858,7 @@ export default function App() {
         {tab===4  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
         {tab===5  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
         {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido}/>}
-        {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} estoqueProdutoFn={estoqueProdutoFn}/>}
+        {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} estoqueProdutoFn={estoqueProdutoFn} idef={idef} custMedioFn={custMedioFn}/>}
         {tab===8  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
         {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
         {tab===10 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
