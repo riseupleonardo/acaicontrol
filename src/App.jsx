@@ -522,36 +522,82 @@ function PedidosTab({ pedidos, setPedidos, fichasCalc, getPreco, setVendas, vend
 // ── VENDAS ───────────────────────────────────────────────────────────────
 function VendasTab({ vendas, setVendas, fichasCalc, getPreco, estoqueProdutoFn }) {
   const today = new Date().toISOString().slice(0,10);
-  const blank = { fichaId:"",qtd:"",data:today };
+  const blank = { fichaId:"", qtd:"", data:today, embalagemTipo:"", embalagemCusto:"", desconto:"" };
   const [f, setF] = useState(blank);
   const totRec = vendas.reduce((s,v)=>s+v.qtd*getPreco(v.fichaId),0);
-  function add() { if(!f.fichaId||!f.qtd||+f.qtd<=0)return alert("Selecione o produto e a quantidade."); const es=estoqueProdutoFn(f.fichaId); if(es<+f.qtd&&!window.confirm(`⚠️ Estoque: ${es} un. Vender mesmo assim?`))return; setVendas([...vendas,{id:uid(),fichaId:f.fichaId,qtd:+f.qtd,data:f.data}]); setF({...blank,data:f.data}); }
+  const totDesc = vendas.reduce((s,v)=>s+(v.desconto||0),0);
+  const totEmb = vendas.reduce((s,v)=>s+(v.embalagemCusto||0),0);
+  const prevRec = f.fichaId&&f.qtd&&+f.qtd>0?getPreco(f.fichaId)*(+f.qtd):0;
+
+  function add() {
+    if(!f.fichaId||!f.qtd||+f.qtd<=0)return alert("Selecione o produto e a quantidade.");
+    const es=estoqueProdutoFn(f.fichaId);
+    if(es<+f.qtd&&!window.confirm(`⚠️ Estoque: ${es} un. Vender mesmo assim?`))return;
+    setVendas([...vendas,{id:uid(),fichaId:f.fichaId,qtd:+f.qtd,data:f.data,embalagemTipo:f.embalagemTipo,embalagemCusto:+f.embalagemCusto||0,desconto:+f.desconto||0}]);
+    setF({...blank,data:f.data});
+  }
   function remover(id) { if(window.confirm("Remover venda?"))setVendas(vendas.filter(v=>v.id!==id)); }
+
   return (
     <>
       <Card title="🛒 Registrar Venda">
-        {!fichasCalc.length?<p style={{ color:"#d97706",background:"#fffbeb",padding:10,borderRadius:8,fontSize:13 }}>⚠️ Cadastre produtos e produção primeiro.</p>:(
+        {!fichasCalc.length?<p style={{color:"#d97706",background:"#fffbeb",padding:10,borderRadius:8,fontSize:13}}>⚠️ Cadastre produtos e produção primeiro.</p>:(
           <>
-            <G cols="3fr 1fr 1fr auto" mb={8}>
+            <G cols="3fr 1fr 1fr auto" mb={10}>
               <div><Lbl s="Produto *"/><select style={S.inp} value={f.fichaId} onChange={e=>setF({...f,fichaId:e.target.value})}><option value="">Selecione...</option>{fichasCalc.map(p=><option key={p.id} value={p.id}>{p.nome} — {fR(getPreco(p.id))}/un · Est: {estoqueProdutoFn(p.id)} un</option>)}</select></div>
               <div><Lbl s="Quantidade *"/><input style={S.inp} type="number" min="1" step="1" value={f.qtd} onChange={e=>setF({...f,qtd:e.target.value})}/></div>
               <div><Lbl s="Data da venda"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
-              <div style={{ display:"flex",alignItems:"flex-end" }}><button style={S.btn} onClick={add}>+ Registrar</button></div>
+              <div style={{display:"flex",alignItems:"flex-end"}}><button style={S.btn} onClick={add}>+ Registrar</button></div>
             </G>
-            {f.fichaId&&f.qtd&&+f.qtd>0&&<div style={{ display:"flex",gap:10,flexWrap:"wrap" }}><span style={{ fontSize:13,color:"#059669",background:"#ecfdf5",padding:"5px 12px",borderRadius:8 }}>💰 Receita: <strong>{fR(getPreco(f.fichaId)*(+f.qtd))}</strong></span><span style={{ fontSize:13,color:"#7c3aed",background:"#f5f3ff",padding:"5px 12px",borderRadius:8 }}>📦 Estoque após: <strong>{estoqueProdutoFn(f.fichaId)-(+f.qtd)} un</strong></span></div>}
+            <div style={{background:"#f9f7ff",border:"1px solid #e9d5ff",borderRadius:10,padding:14,marginBottom:10}}>
+              <h4 style={{margin:"0 0 10px",fontSize:13,color:"#5b21b6",fontWeight:700}}>📦 Embalagem e Desconto</h4>
+              <G cols="1fr 1fr 1fr" gap={8} mb={0}>
+                <div><Lbl s="Tipo de embalagem"/><select style={S.inp} value={f.embalagemTipo} onChange={e=>setF({...f,embalagemTipo:e.target.value,embalagemCusto:""})}><option value="">Sem embalagem</option><option value="1 garrafa">1 garrafa</option><option value="2 garrafas">2 garrafas</option><option value="3 garrafas">3 garrafas</option></select></div>
+                <div><Lbl s="Custo da embalagem (R$)"/><input style={{...S.inp,background:!f.embalagemTipo?"#f3f4f6":"white"}} type="number" step="0.01" min="0" placeholder="Ex: 2,50" value={f.embalagemCusto} disabled={!f.embalagemTipo} onChange={e=>setF({...f,embalagemCusto:e.target.value})}/></div>
+                <div><Lbl s="Desconto (R$)"/><input style={S.inp} type="number" step="0.01" min="0" placeholder="0,00" value={f.desconto} onChange={e=>setF({...f,desconto:e.target.value})}/></div>
+              </G>
+            </div>
+            {prevRec>0&&(
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:"#059669",background:"#ecfdf5",padding:"5px 12px",borderRadius:8}}>💰 Receita bruta: <strong>{fR(prevRec)}</strong></span>
+                {+f.desconto>0&&<span style={{fontSize:13,color:"#ef4444",background:"#fef2f2",padding:"5px 12px",borderRadius:8}}>🏷️ Desconto: <strong>-{fR(+f.desconto)}</strong></span>}
+                {+f.embalagemCusto>0&&<span style={{fontSize:13,color:"#d97706",background:"#fffbeb",padding:"5px 12px",borderRadius:8}}>📦 Embalagem: <strong>-{fR(+f.embalagemCusto)}</strong></span>}
+                <span style={{fontSize:13,color:"#7c3aed",background:"#f5f3ff",padding:"5px 12px",borderRadius:8}}>📦 Estoque após: <strong>{estoqueProdutoFn(f.fichaId)-(+f.qtd)} un</strong></span>
+              </div>
+            )}
           </>
         )}
       </Card>
-      <G cols="1fr 1fr 1fr" gap={12} mb={20}><KPI label="📦 Total vendido" value={vendas.reduce((s,v)=>s+v.qtd,0)+" un"} color="#7c3aed"/><KPI label="🧾 Lançamentos" value={vendas.length} color="#4f46e5"/><KPI label="💵 Receita Total" value={fR(totRec)} color="#059669"/></G>
+      <G cols="repeat(4,1fr)" gap={12} mb={20}>
+        <KPI label="📦 Total vendido" value={vendas.reduce((s,v)=>s+v.qtd,0)+" un"} color="#7c3aed"/>
+        <KPI label="💵 Receita Bruta" value={fR(totRec)} color="#059669"/>
+        <KPI label="🏷️ Total Descontos" value={fR(totDesc)} color="#ef4444"/>
+        <KPI label="📦 Custo Embalagens" value={fR(totEmb)} color="#d97706"/>
+      </G>
       <Card title={`📋 Vendas (${vendas.length})`}>
-        <table style={{ width:"100%",borderCollapse:"collapse",fontSize:14 }}>
-          <thead><tr>{["Produto","Qtd","Preço Unit.","Receita","Data","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
+          <thead><tr>{["Produto","Qtd","Preço Unit.","Receita","Embalagem","Desconto","Data","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
           <tbody>
-            {!vendas.length&&<tr><td colSpan={6} style={{ ...S.td,textAlign:"center",color:"#9ca3af",padding:28 }}>Nenhuma venda registrada.</td></tr>}
+            {!vendas.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"#9ca3af",padding:28}}>Nenhuma venda registrada.</td></tr>}
             {vendas.map(v=>{const fc=fichasCalc.find(p=>p.id===v.fichaId),pr=getPreco(v.fichaId);return(
-              <tr key={v.id}><td style={{ ...S.td,fontWeight:500 }}>{fc?.nome||"—"}</td><td style={S.td}>{v.qtd} un</td><td style={S.td}>{fR(pr)}</td><td style={{ ...S.td,fontWeight:700,color:"#059669" }}>{fR(v.qtd*pr)}</td><td style={S.td}>{v.data||"—"}</td><td style={S.td}><button style={{ ...S.bsm,color:"#ef4444" }} onClick={()=>remover(v.id)}>🗑️</button></td></tr>
+              <tr key={v.id}>
+                <td style={{...S.td,fontWeight:500}}>{fc?.nome||"—"}</td>
+                <td style={S.td}>{v.qtd} un</td>
+                <td style={S.td}>{fR(pr)}</td>
+                <td style={{...S.td,fontWeight:700,color:"#059669"}}>{fR(v.qtd*pr)}</td>
+                <td style={S.td}>{v.embalagemTipo?<span style={{fontSize:12}}><span style={{color:"#d97706",fontWeight:600}}>📦 {v.embalagemTipo}</span><br/><span style={{color:"#6b7280"}}>{fR(v.embalagemCusto)}</span></span>:<span style={{color:"#d1d5db"}}>—</span>}</td>
+                <td style={S.td}>{v.desconto>0?<span style={{color:"#ef4444",fontWeight:600}}>-{fR(v.desconto)}</span>:<span style={{color:"#d1d5db"}}>—</span>}</td>
+                <td style={S.td}>{v.data||"—"}</td>
+                <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>remover(v.id)}>🗑️</button></td>
+              </tr>
             );})}
-            {vendas.length>0&&<tr style={{ background:"#ecfdf5" }}><td colSpan={3} style={{ ...S.td,fontWeight:700,textAlign:"right",color:"#065f46" }}>Receita Total:</td><td style={{ ...S.td,fontWeight:700,color:"#059669",fontSize:15 }}>{fR(totRec)}</td><td colSpan={2} style={S.td}/></tr>}
+            {vendas.length>0&&<tr style={{background:"#ecfdf5"}}>
+              <td colSpan={3} style={{...S.td,fontWeight:700,textAlign:"right",color:"#065f46"}}>Totais:</td>
+              <td style={{...S.td,fontWeight:700,color:"#059669",fontSize:15}}>{fR(totRec)}</td>
+              <td style={{...S.td,color:"#d97706",fontWeight:600}}>{totEmb>0?fR(totEmb):"—"}</td>
+              <td style={{...S.td,color:"#ef4444",fontWeight:600}}>{totDesc>0?`-${fR(totDesc)}`:"—"}</td>
+              <td colSpan={2} style={S.td}/>
+            </tr>}
           </tbody>
         </table>
       </Card>
@@ -612,7 +658,9 @@ function DRETab({ vendas, fichasCalc, getPreco, despesas }) {
 
   const recBruta = vendasFiltradas.reduce((s,v) => s + v.qtd * getPreco(v.fichaId), 0);
   const cmv = vendasFiltradas.reduce((s,v) => { const f=fichasCalc.find(p=>p.id===v.fichaId); return s+(f?v.qtd*f.custo:0); }, 0);
-  const lucBruto = recBruta - cmv;
+  const totalEmbalagens = vendasFiltradas.reduce((s,v) => s+(v.embalagemCusto||0), 0);
+  const totalDescontos = vendasFiltradas.reduce((s,v) => s+(v.desconto||0), 0);
+  const lucBruto = recBruta - cmv - totalEmbalagens - totalDescontos;
   const totDesp = despesas.reduce((s,d) => s+(+d.valor||0), 0);
   const lucOp = lucBruto - totDesp;
   const mbPct = recBruta > 0 ? lucBruto/recBruta*100 : 0;
