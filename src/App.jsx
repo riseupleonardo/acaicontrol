@@ -82,14 +82,8 @@ function LoginScreen({ usuarios, onLogin }) {
           <h1 style={{ margin:"10px 0 4px",fontSize:24,fontWeight:800,color:"#3730a3" }}>NaGarrafa</h1>
           <p style={{ margin:0,fontSize:13,color:"#9ca3af" }}>Faça login para continuar</p>
         </div>
-        <div style={{ marginBottom:14 }}>
-          <Lbl s="Usuário" />
-          <input style={S.inp} placeholder="Nome de usuário" value={user} onChange={e=>{ setUser(e.target.value); setErr(""); }} onKeyDown={e=>e.key==="Enter"&&tentar()} />
-        </div>
-        <div style={{ marginBottom:20 }}>
-          <Lbl s="Senha" />
-          <input style={S.inp} type="password" placeholder="Senha" value={pass} onChange={e=>{ setPass(e.target.value); setErr(""); }} onKeyDown={e=>e.key==="Enter"&&tentar()} />
-        </div>
+        <div style={{ marginBottom:14 }}><Lbl s="Usuário"/><input style={S.inp} placeholder="Nome de usuário" value={user} onChange={e=>{ setUser(e.target.value); setErr(""); }} onKeyDown={e=>e.key==="Enter"&&tentar()}/></div>
+        <div style={{ marginBottom:20 }}><Lbl s="Senha"/><input style={S.inp} type="password" placeholder="Senha" value={pass} onChange={e=>{ setPass(e.target.value); setErr(""); }} onKeyDown={e=>e.key==="Enter"&&tentar()}/></div>
         {err && <p style={{ margin:"0 0 14px",fontSize:13,color:"#ef4444",background:"#fef2f2",padding:"8px 12px",borderRadius:8 }}>⚠️ {err}</p>}
         <button style={{ ...S.btn,width:"100%",padding:12,fontSize:15 }} onClick={tentar}>Entrar</button>
       </div>
@@ -120,7 +114,7 @@ function UsuariosTab({ usuarios, setUsuarios, currentUser }) {
       <Card title={eid?"✏️ Editar Usuário":"➕ Novo Usuário"}>
         <G cols="2fr 2fr 1fr 1fr auto">
           <div><Lbl s="Nome *"/><input style={S.inp} placeholder="Ex: Maria" value={f.nome} onChange={e=>setF({...f,nome:e.target.value})}/></div>
-          <div><Lbl s={eid?"Nova senha (deixe em branco para manter)":"Senha *"}/><input style={S.inp} type="password" placeholder={eid?"••••••":"Mínimo 4 caracteres"} value={f.senha} onChange={e=>setF({...f,senha:e.target.value})}/></div>
+          <div><Lbl s={eid?"Nova senha (em branco para manter)":"Senha *"}/><input style={S.inp} type="password" placeholder={eid?"••••••":"Mínimo 4 caracteres"} value={f.senha} onChange={e=>setF({...f,senha:e.target.value})}/></div>
           <div><Lbl s="Perfil"/><select style={S.inp} value={f.role} onChange={e=>setF({...f,role:e.target.value})}>{Object.keys(ROLES).map(r=><option key={r}>{r}</option>)}</select></div>
           <div><Lbl s="Status"/><select style={S.inp} value={f.ativo?"Ativo":"Inativo"} onChange={e=>setF({...f,ativo:e.target.value==="Ativo"})}><option>Ativo</option><option>Inativo</option></select></div>
           <div style={{ display:"flex",alignItems:"flex-end",gap:6 }}>{eid&&<button style={S.btn2} onClick={()=>{setF(blank);setEid(null)}}>✕</button>}<button style={S.btn} onClick={salvar}>{eid?"✓":"+"}</button></div>
@@ -163,7 +157,7 @@ function InsumosDefTab({ idef, setIdef }) {
   const [eid, setEid] = useState(null);
   function salvar() { if(!f.nome.trim())return alert("Informe o nome."); const it={id:eid||uid(),nome:f.nome.trim(),unidade:f.unidade}; setIdef(eid?idef.map(i=>i.id===eid?it:i):[...idef,it]); setF(blank);setEid(null); }
   function editar(i) { setF({nome:i.nome,unidade:i.unidade});setEid(i.id); }
-  function remover(id) { if(window.confirm("Remover insumo?"))setIdef(idef.filter(i=>i.id!==id)); }
+  function remover(id) { if(window.confirm("Remover?"))setIdef(idef.filter(i=>i.id!==id)); }
   return (
     <>
       <Card title="➕ Cadastrar Insumo">
@@ -426,7 +420,7 @@ function ProducaoTab({ producoes, setProducoes, fichasCalc, idef, estoqueInsumoF
   return (
     <>
       <Card title="🏭 Registrar Lote de Produção">
-        {!fichasCalc.length?<p style={{ color:"#d97706",background:"#fffbeb",padding:10,borderRadius:8,fontSize:13 }}>⚠️ Cadastre fichas técnicas antes de registrar produções.</p>:(
+        {!fichasCalc.length?<p style={{ color:"#d97706",background:"#fffbeb",padding:10,borderRadius:8,fontSize:13 }}>⚠️ Cadastre fichas técnicas antes.</p>:(
           <>
             <G cols="2fr 1fr 1fr auto">
               <div><Lbl s="Produto *"/><select style={S.inp} value={f.fichaId} onChange={e=>setF({...f,fichaId:e.target.value})}><option value="">Selecione...</option>{fichasCalc.map(p=><option key={p.id} value={p.id}>{p.nome} — {fR(p.custo)}/un</option>)}</select></div>
@@ -476,7 +470,7 @@ function PedidosTab({ pedidos, setPedidos, fichasCalc, getPreco, setVendas, vend
   const [f, setF] = useState(blank);
   const [filtro, setFiltro] = useState("Todos");
   function registrar() { if(!f.fichaId)return alert("Selecione o produto."); if(!f.qtd||+f.qtd<=0)return alert("Informe a quantidade."); setPedidos([...pedidos,{id:uid(),fichaId:f.fichaId,qtd:+f.qtd,data:f.data,canal:f.canal,obs:f.obs,status:"Pendente"}]); setF({...blank,data:f.data,canal:f.canal}); }
-  function confirmar(pedido) { const es=estoqueProdutoFn(pedido.fichaId); if(es<pedido.qtd&&!window.confirm(`⚠️ Estoque: ${es} un. Confirmar mesmo assim?`))return; setPedidos(pedidos.map(p=>p.id===pedido.id?{...p,status:"Confirmado"}:p)); setVendas([...vendas,{id:uid(),fichaId:pedido.fichaId,qtd:pedido.qtd,data:pedido.data,pedidoId:pedido.id}]); }
+  function confirmar(pedido) { const es=estoqueProdutoFn(pedido.fichaId); if(es<pedido.qtd&&!window.confirm(`⚠️ Estoque: ${es} un. Confirmar?`))return; setPedidos(pedidos.map(p=>p.id===pedido.id?{...p,status:"Confirmado"}:p)); setVendas([...vendas,{id:uid(),fichaId:pedido.fichaId,qtd:pedido.qtd,data:pedido.data,pedidoId:pedido.id,embalagemCusto:0,embQtd:0,desconto:0}]); }
   function cancelar(id) { if(window.confirm("Cancelar?"))setPedidos(pedidos.map(p=>p.id===id?{...p,status:"Cancelado"}:p)); }
   function remover(id) { if(window.confirm("Excluir?"))setPedidos(pedidos.filter(p=>p.id!==id)); }
   const pendentes=pedidos.filter(p=>p.status==="Pendente").length,confirmados=pedidos.filter(p=>p.status==="Confirmado").length,cancelados=pedidos.filter(p=>p.status==="Cancelado").length;
@@ -520,20 +514,25 @@ function PedidosTab({ pedidos, setPedidos, fichasCalc, getPreco, setVendas, vend
 }
 
 // ── VENDAS ───────────────────────────────────────────────────────────────
-function VendasTab({ vendas, setVendas, fichasCalc, getPreco, estoqueProdutoFn }) {
+function VendasTab({ vendas, setVendas, fichasCalc, getPreco, estoqueProdutoFn, idef, custMedioFn }) {
   const today = new Date().toISOString().slice(0,10);
-  const blank = { fichaId:"", qtd:"", data:today, embalagemTipo:"", embalagemCusto:"", desconto:"" };
+  const blank = { fichaId:"",qtd:"",data:today,usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"" };
   const [f, setF] = useState(blank);
+  const insEmb = idef.filter(i=>i.nome.toLowerCase().includes("embalagem")||i.nome.toLowerCase().includes("sacola")||i.nome.toLowerCase().includes("caixa"));
+  const cmEmb = f.embInsumoId ? custMedioFn(f.embInsumoId) : 0;
+  const custoEmb = f.usaEmbalagem&&+f.embQtd>0&&cmEmb>0 ? cmEmb*(+f.embQtd) : 0;
   const totRec = vendas.reduce((s,v)=>s+v.qtd*getPreco(v.fichaId),0);
   const totDesc = vendas.reduce((s,v)=>s+(v.desconto||0),0);
   const totEmb = vendas.reduce((s,v)=>s+(v.embalagemCusto||0),0);
-  const prevRec = f.fichaId&&f.qtd&&+f.qtd>0?getPreco(f.fichaId)*(+f.qtd):0;
+  const prevRec = f.fichaId&&f.qtd&&+f.qtd>0 ? getPreco(f.fichaId)*(+f.qtd) : 0;
 
   function add() {
     if(!f.fichaId||!f.qtd||+f.qtd<=0)return alert("Selecione o produto e a quantidade.");
+    if(f.usaEmbalagem&&!f.embInsumoId)return alert("Selecione o insumo de embalagem.");
+    if(f.usaEmbalagem&&(!f.embQtd||+f.embQtd<=0))return alert("Informe a quantidade de embalagens.");
     const es=estoqueProdutoFn(f.fichaId);
     if(es<+f.qtd&&!window.confirm(`⚠️ Estoque: ${es} un. Vender mesmo assim?`))return;
-    setVendas([...vendas,{id:uid(),fichaId:f.fichaId,qtd:+f.qtd,data:f.data,embalagemTipo:f.embalagemTipo,embalagemCusto:+f.embalagemCusto||0,desconto:+f.desconto||0}]);
+    setVendas([...vendas,{id:uid(),fichaId:f.fichaId,qtd:+f.qtd,data:f.data,embalagemCusto:custoEmb,embQtd:f.usaEmbalagem?+f.embQtd:0,embInsumoId:f.embInsumoId,desconto:+f.desconto||0}]);
     setF({...blank,data:f.data});
   }
   function remover(id) { if(window.confirm("Remover venda?"))setVendas(vendas.filter(v=>v.id!==id)); }
@@ -541,28 +540,48 @@ function VendasTab({ vendas, setVendas, fichasCalc, getPreco, estoqueProdutoFn }
   return (
     <>
       <Card title="🛒 Registrar Venda">
-        {!fichasCalc.length?<p style={{color:"#d97706",background:"#fffbeb",padding:10,borderRadius:8,fontSize:13}}>⚠️ Cadastre produtos e produção primeiro.</p>:(
+        {!fichasCalc.length?<p style={{ color:"#d97706",background:"#fffbeb",padding:10,borderRadius:8,fontSize:13 }}>⚠️ Cadastre produtos e produção primeiro.</p>:(
           <>
             <G cols="3fr 1fr 1fr auto" mb={10}>
               <div><Lbl s="Produto *"/><select style={S.inp} value={f.fichaId} onChange={e=>setF({...f,fichaId:e.target.value})}><option value="">Selecione...</option>{fichasCalc.map(p=><option key={p.id} value={p.id}>{p.nome} — {fR(getPreco(p.id))}/un · Est: {estoqueProdutoFn(p.id)} un</option>)}</select></div>
               <div><Lbl s="Quantidade *"/><input style={S.inp} type="number" min="1" step="1" value={f.qtd} onChange={e=>setF({...f,qtd:e.target.value})}/></div>
               <div><Lbl s="Data da venda"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
-              <div style={{display:"flex",alignItems:"flex-end"}}><button style={S.btn} onClick={add}>+ Registrar</button></div>
+              <div style={{ display:"flex",alignItems:"flex-end" }}><button style={S.btn} onClick={add}>+ Registrar</button></div>
             </G>
-            <div style={{background:"#f9f7ff",border:"1px solid #e9d5ff",borderRadius:10,padding:14,marginBottom:10}}>
-              <h4 style={{margin:"0 0 10px",fontSize:13,color:"#5b21b6",fontWeight:700}}>📦 Embalagem e Desconto</h4>
-              <G cols="1fr 1fr 1fr" gap={8} mb={0}>
-                <div><Lbl s="Tipo de embalagem"/><select style={S.inp} value={f.embalagemTipo} onChange={e=>setF({...f,embalagemTipo:e.target.value,embalagemCusto:""})}><option value="">Sem embalagem</option><option value="1 garrafa">1 garrafa</option><option value="2 garrafas">2 garrafas</option><option value="3 garrafas">3 garrafas</option></select></div>
-                <div><Lbl s="Custo da embalagem (R$)"/><input style={{...S.inp,background:!f.embalagemTipo?"#f3f4f6":"white"}} type="number" step="0.01" min="0" placeholder="Ex: 2,50" value={f.embalagemCusto} disabled={!f.embalagemTipo} onChange={e=>setF({...f,embalagemCusto:e.target.value})}/></div>
-                <div><Lbl s="Desconto (R$)"/><input style={S.inp} type="number" step="0.01" min="0" placeholder="0,00" value={f.desconto} onChange={e=>setF({...f,desconto:e.target.value})}/></div>
+            <div style={{ background:"#f9f7ff",border:"1px solid #e9d5ff",borderRadius:10,padding:14,marginBottom:10 }}>
+              <G cols="1fr 1fr" gap={16} mb={0}>
+                <div>
+                  <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:10 }}>
+                    <input type="checkbox" id="usaEmb" checked={f.usaEmbalagem} onChange={e=>setF({...f,usaEmbalagem:e.target.checked,embQtd:"",embInsumoId:""})} style={{ width:16,height:16,accentColor:"#7c3aed",cursor:"pointer" }}/>
+                    <label htmlFor="usaEmb" style={{ fontSize:14,fontWeight:600,color:"#3730a3",cursor:"pointer" }}>📦 Usar embalagem?</label>
+                  </div>
+                  {f.usaEmbalagem&&(
+                    <G cols="1fr 1fr" gap={8} mb={0}>
+                      <div><Lbl s="Insumo de embalagem"/>
+                        <select style={S.inp} value={f.embInsumoId} onChange={e=>setF({...f,embInsumoId:e.target.value})}>
+                          <option value="">Selecione...</option>
+                          {(insEmb.length?insEmb:idef).map(i=>{const cm=custMedioFn(i.id);return<option key={i.id} value={i.id}>{i.nome} — {cm>0?fR(cm):"sem compras"}/{i.unidade}</option>;})}
+                        </select>
+                      </div>
+                      <div><Lbl s="Qtd. de embalagens"/><input style={S.inp} type="number" min="1" step="1" placeholder="Ex: 2" value={f.embQtd} onChange={e=>setF({...f,embQtd:e.target.value})}/></div>
+                    </G>
+                  )}
+                  {f.usaEmbalagem&&f.embInsumoId&&f.embQtd&&+f.embQtd>0&&cmEmb>0&&<div style={{ marginTop:8,fontSize:13,background:"#fffbeb",color:"#92400e",padding:"6px 12px",borderRadius:8 }}>📦 {f.embQtd} un × {fR(cmEmb)} = <strong>{fR(custoEmb)}</strong></div>}
+                  {f.usaEmbalagem&&f.embInsumoId&&cmEmb===0&&<p style={{ fontSize:12,color:"#ef4444",marginTop:6 }}>⚠️ Sem custo médio. Registre uma compra primeiro.</p>}
+                </div>
+                <div>
+                  <Lbl s="🏷️ Desconto (R$)"/>
+                  <input style={S.inp} type="number" step="0.01" min="0" placeholder="0,00" value={f.desconto} onChange={e=>setF({...f,desconto:e.target.value})}/>
+                  {+f.desconto>0&&<p style={{ fontSize:12,color:"#ef4444",marginTop:6 }}>Desconto de <strong>{fR(+f.desconto)}</strong> será aplicado</p>}
+                </div>
               </G>
             </div>
             {prevRec>0&&(
-              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <span style={{fontSize:13,color:"#059669",background:"#ecfdf5",padding:"5px 12px",borderRadius:8}}>💰 Receita bruta: <strong>{fR(prevRec)}</strong></span>
-                {+f.desconto>0&&<span style={{fontSize:13,color:"#ef4444",background:"#fef2f2",padding:"5px 12px",borderRadius:8}}>🏷️ Desconto: <strong>-{fR(+f.desconto)}</strong></span>}
-                {+f.embalagemCusto>0&&<span style={{fontSize:13,color:"#d97706",background:"#fffbeb",padding:"5px 12px",borderRadius:8}}>📦 Embalagem: <strong>-{fR(+f.embalagemCusto)}</strong></span>}
-                <span style={{fontSize:13,color:"#7c3aed",background:"#f5f3ff",padding:"5px 12px",borderRadius:8}}>📦 Estoque após: <strong>{estoqueProdutoFn(f.fichaId)-(+f.qtd)} un</strong></span>
+              <div style={{ display:"flex",gap:10,flexWrap:"wrap" }}>
+                <span style={{ fontSize:13,color:"#059669",background:"#ecfdf5",padding:"5px 12px",borderRadius:8 }}>💰 Receita bruta: <strong>{fR(prevRec)}</strong></span>
+                {custoEmb>0&&<span style={{ fontSize:13,color:"#d97706",background:"#fffbeb",padding:"5px 12px",borderRadius:8 }}>📦 Embalagem: <strong>-{fR(custoEmb)}</strong></span>}
+                {+f.desconto>0&&<span style={{ fontSize:13,color:"#ef4444",background:"#fef2f2",padding:"5px 12px",borderRadius:8 }}>🏷️ Desconto: <strong>-{fR(+f.desconto)}</strong></span>}
+                <span style={{ fontSize:13,color:"#7c3aed",background:"#f5f3ff",padding:"5px 12px",borderRadius:8 }}>📦 Estoque após: <strong>{estoqueProdutoFn(f.fichaId)-(+f.qtd)} un</strong></span>
               </div>
             )}
           </>
@@ -575,29 +594,23 @@ function VendasTab({ vendas, setVendas, fichasCalc, getPreco, estoqueProdutoFn }
         <KPI label="📦 Custo Embalagens" value={fR(totEmb)} color="#d97706"/>
       </G>
       <Card title={`📋 Vendas (${vendas.length})`}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
+        <table style={{ width:"100%",borderCollapse:"collapse",fontSize:14 }}>
           <thead><tr>{["Produto","Qtd","Preço Unit.","Receita","Embalagem","Desconto","Data","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
           <tbody>
-            {!vendas.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"#9ca3af",padding:28}}>Nenhuma venda registrada.</td></tr>}
-            {vendas.map(v=>{const fc=fichasCalc.find(p=>p.id===v.fichaId),pr=getPreco(v.fichaId);return(
+            {!vendas.length&&<tr><td colSpan={8} style={{ ...S.td,textAlign:"center",color:"#9ca3af",padding:28 }}>Nenhuma venda registrada.</td></tr>}
+            {vendas.map(v=>{const fc=fichasCalc.find(p=>p.id===v.fichaId),pr=getPreco(v.fichaId),ins2=idef.find(i=>i.id===v.embInsumoId);return(
               <tr key={v.id}>
-                <td style={{...S.td,fontWeight:500}}>{fc?.nome||"—"}</td>
+                <td style={{ ...S.td,fontWeight:500 }}>{fc?.nome||"—"}</td>
                 <td style={S.td}>{v.qtd} un</td>
                 <td style={S.td}>{fR(pr)}</td>
-                <td style={{...S.td,fontWeight:700,color:"#059669"}}>{fR(v.qtd*pr)}</td>
-                <td style={S.td}>{v.embalagemTipo?<span style={{fontSize:12}}><span style={{color:"#d97706",fontWeight:600}}>📦 {v.embalagemTipo}</span><br/><span style={{color:"#6b7280"}}>{fR(v.embalagemCusto)}</span></span>:<span style={{color:"#d1d5db"}}>—</span>}</td>
-                <td style={S.td}>{v.desconto>0?<span style={{color:"#ef4444",fontWeight:600}}>-{fR(v.desconto)}</span>:<span style={{color:"#d1d5db"}}>—</span>}</td>
+                <td style={{ ...S.td,fontWeight:700,color:"#059669" }}>{fR(v.qtd*pr)}</td>
+                <td style={S.td}>{v.embQtd>0?<span style={{ fontSize:12 }}><span style={{ color:"#d97706",fontWeight:600 }}>📦 {v.embQtd} un</span><br/><span style={{ color:"#6b7280",fontSize:11 }}>{ins2?.nome||""} — {fR(v.embalagemCusto)}</span></span>:<span style={{ color:"#d1d5db" }}>—</span>}</td>
+                <td style={S.td}>{v.desconto>0?<span style={{ color:"#ef4444",fontWeight:600 }}>-{fR(v.desconto)}</span>:<span style={{ color:"#d1d5db" }}>—</span>}</td>
                 <td style={S.td}>{v.data||"—"}</td>
-                <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>remover(v.id)}>🗑️</button></td>
+                <td style={S.td}><button style={{ ...S.bsm,color:"#ef4444" }} onClick={()=>remover(v.id)}>🗑️</button></td>
               </tr>
             );})}
-            {vendas.length>0&&<tr style={{background:"#ecfdf5"}}>
-              <td colSpan={3} style={{...S.td,fontWeight:700,textAlign:"right",color:"#065f46"}}>Totais:</td>
-              <td style={{...S.td,fontWeight:700,color:"#059669",fontSize:15}}>{fR(totRec)}</td>
-              <td style={{...S.td,color:"#d97706",fontWeight:600}}>{totEmb>0?fR(totEmb):"—"}</td>
-              <td style={{...S.td,color:"#ef4444",fontWeight:600}}>{totDesc>0?`-${fR(totDesc)}`:"—"}</td>
-              <td colSpan={2} style={S.td}/>
-            </tr>}
+            {vendas.length>0&&<tr style={{ background:"#ecfdf5" }}><td colSpan={3} style={{ ...S.td,fontWeight:700,textAlign:"right",color:"#065f46" }}>Totais:</td><td style={{ ...S.td,fontWeight:700,color:"#059669",fontSize:15 }}>{fR(totRec)}</td><td style={{ ...S.td,color:"#d97706",fontWeight:600 }}>{totEmb>0?fR(totEmb):"—"}</td><td style={{ ...S.td,color:"#ef4444",fontWeight:600 }}>{totDesc>0?`-${fR(totDesc)}`:"—"}</td><td colSpan={2} style={S.td}/></tr>}
           </tbody>
         </table>
       </Card>
@@ -649,35 +662,31 @@ function DRETab({ vendas, fichasCalc, getPreco, despesas }) {
   const anosDisp = [...new Set(vendas.map(v => v.data?.slice(0,4)).filter(Boolean))].sort();
 
   const vendasFiltradas = filtroAtivo
-    ? vendas.filter(v => {
-        if (!v.data) return false;
-        const [y, m] = v.data.split("-");
-        return +m === mes && +y === ano;
-      })
+    ? vendas.filter(v => { if(!v.data)return false; const[y,m]=v.data.split("-"); return +m===mes&&+y===ano; })
     : vendas;
 
-  const recBruta = vendasFiltradas.reduce((s,v) => s + v.qtd * getPreco(v.fichaId), 0);
+  const recBruta = vendasFiltradas.reduce((s,v) => s+v.qtd*getPreco(v.fichaId), 0);
   const cmv = vendasFiltradas.reduce((s,v) => { const f=fichasCalc.find(p=>p.id===v.fichaId); return s+(f?v.qtd*f.custo:0); }, 0);
   const totalEmbalagens = vendasFiltradas.reduce((s,v) => s+(v.embalagemCusto||0), 0);
   const totalDescontos = vendasFiltradas.reduce((s,v) => s+(v.desconto||0), 0);
   const lucBruto = recBruta - cmv - totalEmbalagens - totalDescontos;
   const totDesp = despesas.reduce((s,d) => s+(+d.valor||0), 0);
   const lucOp = lucBruto - totDesp;
-  const mbPct = recBruta > 0 ? lucBruto/recBruta*100 : 0;
-  const moPct = recBruta > 0 ? lucOp/recBruta*100 : 0;
+  const mbPct = recBruta>0 ? lucBruto/recBruta*100 : 0;
+  const moPct = recBruta>0 ? lucOp/recBruta*100 : 0;
   const periodoLabel = filtroAtivo ? `${MESES[mes-1]}/${ano}` : "Todo o período";
 
   function exportCSV() {
-    const rows=[["Período",periodoLabel,""],["Descrição","Valor (R$)","% Receita"],["Receita Bruta",recBruta.toFixed(2),"100.0%"],["(-) CMV",(-cmv).toFixed(2),recBruta>0?fP(-cmv/recBruta*100):"-"],["(=) Lucro Bruto",lucBruto.toFixed(2),fP(mbPct)],...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),recBruta>0?fP(-d.valor/recBruta*100):"-"]),["(=) Lucro Operacional",lucOp.toFixed(2),fP(moPct)]];
+    const rows=[["Período",periodoLabel,""],["Descrição","Valor (R$)","% Receita"],["Receita Bruta",recBruta.toFixed(2),"100.0%"],["(-) CMV",(-cmv).toFixed(2),recBruta>0?fP(-cmv/recBruta*100):"-"],["(-) Embalagens",(-totalEmbalagens).toFixed(2),recBruta>0?fP(-totalEmbalagens/recBruta*100):"-"],["(-) Descontos",(-totalDescontos).toFixed(2),recBruta>0?fP(-totalDescontos/recBruta*100):"-"],["(=) Lucro Bruto",lucBruto.toFixed(2),fP(mbPct)],...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),recBruta>0?fP(-d.valor/recBruta*100):"-"]),["(=) Lucro Operacional",lucOp.toFixed(2),fP(moPct)]];
     const a=document.createElement("a"); a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n")); a.download=`DRE_NaGarrafa_${periodoLabel.replace("/","_")}.csv`; a.click();
   }
 
   function Row({ label, value, indent=0, bold=false, color, bg, sep }) {
     return (
       <tr style={{ background:bg, borderTop:sep?"2px solid #ddd6fe":"none" }}>
-        <td style={{ ...S.td, paddingLeft:16+indent*20, fontWeight:bold?700:400, color:color||"#374151", fontSize:bold?15:14 }}>{label}</td>
-        <td style={{ ...S.td, textAlign:"right", fontWeight:bold?700:500, color:color||"#374151", fontSize:bold?15:14 }}>{fR(value)}</td>
-        <td style={{ ...S.td, textAlign:"right", fontSize:13, color:"#9ca3af" }}>{recBruta>0?fP(value/recBruta*100):"—"}</td>
+        <td style={{ ...S.td,paddingLeft:16+indent*20,fontWeight:bold?700:400,color:color||"#374151",fontSize:bold?15:14 }}>{label}</td>
+        <td style={{ ...S.td,textAlign:"right",fontWeight:bold?700:500,color:color||"#374151",fontSize:bold?15:14 }}>{fR(value)}</td>
+        <td style={{ ...S.td,textAlign:"right",fontSize:13,color:"#9ca3af" }}>{recBruta>0?fP(value/recBruta*100):"—"}</td>
       </tr>
     );
   }
@@ -685,67 +694,47 @@ function DRETab({ vendas, fichasCalc, getPreco, despesas }) {
   return (
     <>
       <Card title="🗓️ Filtro de Período">
-        <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <input type="checkbox" id="filtroAtivo" checked={filtroAtivo} onChange={e => setFiltroAtivo(e.target.checked)} style={{ width:16, height:16, accentColor:"#7c3aed", cursor:"pointer" }} />
-            <label htmlFor="filtroAtivo" style={{ fontSize:14, fontWeight:600, color:"#3730a3", cursor:"pointer" }}>Filtrar por período</label>
+        <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+            <input type="checkbox" id="filtroAtivo" checked={filtroAtivo} onChange={e=>setFiltroAtivo(e.target.checked)} style={{ width:16,height:16,accentColor:"#7c3aed",cursor:"pointer" }}/>
+            <label htmlFor="filtroAtivo" style={{ fontSize:14,fontWeight:600,color:"#3730a3",cursor:"pointer" }}>Filtrar por período</label>
           </div>
-          <div style={{ display:"flex", gap:8, opacity:filtroAtivo?1:.4, pointerEvents:filtroAtivo?"auto":"none" }}>
-            <div>
-              <Lbl s="Mês" />
-              <select style={{ ...S.inp, width:150 }} value={mes} onChange={e => setMes(+e.target.value)}>
-                {MESES.map((m,i) => <option key={i+1} value={i+1}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <Lbl s="Ano" />
-              <select style={{ ...S.inp, width:100 }} value={ano} onChange={e => setAno(+e.target.value)}>
-                {[...new Set([...anosDisp, String(now.getFullYear())])].sort().map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
+          <div style={{ display:"flex",gap:8,opacity:filtroAtivo?1:.4,pointerEvents:filtroAtivo?"auto":"none" }}>
+            <div><Lbl s="Mês"/><select style={{ ...S.inp,width:150 }} value={mes} onChange={e=>setMes(+e.target.value)}>{MESES.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}</select></div>
+            <div><Lbl s="Ano"/><select style={{ ...S.inp,width:100 }} value={ano} onChange={e=>setAno(+e.target.value)}>{[...new Set([...anosDisp,String(now.getFullYear())])].sort().map(a=><option key={a} value={a}>{a}</option>)}</select></div>
           </div>
-          <div style={{ marginLeft:8, marginTop:16 }}>
-            <span style={{ fontSize:13, background:filtroAtivo?"#ede9fe":"#f3f4f6", color:filtroAtivo?"#5b21b6":"#6b7280", padding:"6px 14px", borderRadius:20, fontWeight:600 }}>
-              {filtroAtivo ? `📅 Exibindo: ${periodoLabel}` : "📅 Exibindo: Todo o período"}
+          <div style={{ marginLeft:8,marginTop:16 }}>
+            <span style={{ fontSize:13,background:filtroAtivo?"#ede9fe":"#f3f4f6",color:filtroAtivo?"#5b21b6":"#6b7280",padding:"6px 14px",borderRadius:20,fontWeight:600 }}>
+              {filtroAtivo?`📅 Exibindo: ${periodoLabel}`:"📅 Exibindo: Todo o período"}
             </span>
           </div>
-          {filtroAtivo && (
-            <div style={{ marginTop:16 }}>
-              <span style={{ fontSize:13, color:"#059669", background:"#ecfdf5", padding:"6px 14px", borderRadius:20 }}>
-                🧾 {vendasFiltradas.length} venda(s) no período
-              </span>
-            </div>
-          )}
+          {filtroAtivo&&<div style={{ marginTop:16 }}><span style={{ fontSize:13,color:"#059669",background:"#ecfdf5",padding:"6px 14px",borderRadius:20 }}>🧾 {vendasFiltradas.length} venda(s) no período</span></div>}
         </div>
       </Card>
 
       <G cols="repeat(4,1fr)" gap={12} mb={20}>
-        <KPI label="💵 Receita Bruta" value={fR(recBruta)} color="#059669" />
-        <KPI label="📈 Lucro Bruto" value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"} />
-        <KPI label="📊 Margem Bruta" value={fP(mbPct)} color={mbPct>=0?"#6d28d9":"#ef4444"} />
-        <KPI label="🏆 Lucro Operacional" value={fR(lucOp)} color={lucOp>=0?"#1d4ed8":"#ef4444"} />
+        <KPI label="💵 Receita Bruta" value={fR(recBruta)} color="#059669"/>
+        <KPI label="📈 Lucro Bruto" value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
+        <KPI label="📊 Margem Bruta" value={fP(mbPct)} color={mbPct>=0?"#6d28d9":"#ef4444"}/>
+        <KPI label="🏆 Lucro Operacional" value={fR(lucOp)} color={lucOp>=0?"#1d4ed8":"#ef4444"}/>
       </G>
 
       <Card title={`📊 DRE — ${periodoLabel}`} right={<button style={S.btn2} onClick={exportCSV}>📥 Exportar CSV</button>}>
-        <table style={{ width:"100%", borderCollapse:"collapse" }}>
-          <thead>
-            <tr style={{ background:"#4c1d95" }}>
-              {["Descrição","Valor (R$)","% Receita"].map(h => (
-                <th key={h} style={{ ...S.th, background:"#4c1d95", color:"white", textAlign:h!=="Descrição"?"right":"left" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
+        <table style={{ width:"100%",borderCollapse:"collapse" }}>
+          <thead><tr style={{ background:"#4c1d95" }}>{["Descrição","Valor (R$)","% Receita"].map(h=><th key={h} style={{ ...S.th,background:"#4c1d95",color:"white",textAlign:h!=="Descrição"?"right":"left" }}>{h}</th>)}</tr></thead>
           <tbody>
-            <Row label="(+) RECEITA BRUTA" value={recBruta} bold color="#059669" bg="#f0fdf4" />
-            <Row label="(-) CMV — Custo das Mercadorias Vendidas" value={-cmv} indent={1} color="#dc2626" />
-            <Row label="(=) LUCRO BRUTO" value={lucBruto} bold bg="#f5f3ff" sep color={lucBruto>=0?"#7c3aed":"#ef4444"} />
-            <Row label="(-) DESPESAS OPERACIONAIS" value={-totDesp} bold color="#d97706" sep />
-            {despesas.map(d => <Row key={d.id} label={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} value={-d.valor} indent={2} />)}
-            <Row label="(=) LUCRO OPERACIONAL" value={lucOp} bold bg={lucOp>=0?"#ecfdf5":"#fef2f2"} sep color={lucOp>=0?"#059669":"#ef4444"} />
+            <Row label="(+) RECEITA BRUTA" value={recBruta} bold color="#059669" bg="#f0fdf4"/>
+            <Row label="(-) CMV — Custo das Mercadorias Vendidas" value={-cmv} indent={1} color="#dc2626"/>
+            {totalEmbalagens>0&&<Row label="(-) Custos de Embalagem" value={-totalEmbalagens} indent={1} color="#dc2626"/>}
+            {totalDescontos>0&&<Row label="(-) Descontos Concedidos" value={-totalDescontos} indent={1} color="#dc2626"/>}
+            <Row label="(=) LUCRO BRUTO" value={lucBruto} bold bg="#f5f3ff" sep color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
+            <Row label="(-) DESPESAS OPERACIONAIS" value={-totDesp} bold color="#d97706" sep/>
+            {despesas.map(d=><Row key={d.id} label={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} value={-d.valor} indent={2}/>)}
+            <Row label="(=) LUCRO OPERACIONAL" value={lucOp} bold bg={lucOp>=0?"#ecfdf5":"#fef2f2"} sep color={lucOp>=0?"#059669":"#ef4444"}/>
             <tr style={{ background:"#f5f3ff" }}>
-              <td style={{ ...S.td, fontWeight:700, color:"#3730a3" }}>📐 Margem Operacional</td>
-              <td style={{ ...S.td, textAlign:"right", fontWeight:700, color:moPct>=0?"#7c3aed":"#ef4444", fontSize:16 }}>{fP(moPct)}</td>
-              <td style={S.td} />
+              <td style={{ ...S.td,fontWeight:700,color:"#3730a3" }}>📐 Margem Operacional</td>
+              <td style={{ ...S.td,textAlign:"right",fontWeight:700,color:moPct>=0?"#7c3aed":"#ef4444",fontSize:16 }}>{fP(moPct)}</td>
+              <td style={S.td}/>
             </tr>
           </tbody>
         </table>
@@ -794,16 +783,16 @@ export default function App() {
   const [pedidos, setPedidos]     = useState(() => lsGet("ac4_ped", []));
   const [vendas, setVendas]       = useState(() => lsGet("ac4_ven", []));
 
-  useEffect(() => { lsSet("ac4_usr",  usuarios);  }, [usuarios]);
-  useEffect(() => { lsSet("ac4_idef", idef);      }, [idef]);
-  useEffect(() => { lsSet("ac4_ent",  entradas);  }, [entradas]);
-  useEffect(() => { lsSet("ac4_fic",  fichas);    }, [fichas]);
-  useEffect(() => { lsSet("ac4_mar",  margens);   }, [margens]);
-  useEffect(() => { lsSet("ac4_pre",  precos);    }, [precos]);
-  useEffect(() => { lsSet("ac4_des",  despesas);  }, [despesas]);
-  useEffect(() => { lsSet("ac4_prod", producoes); }, [producoes]);
-  useEffect(() => { lsSet("ac4_ped",  pedidos);   }, [pedidos]);
-  useEffect(() => { lsSet("ac4_ven",  vendas);    }, [vendas]);
+  useEffect(()=>{ lsSet("ac4_usr",  usuarios);  },[usuarios]);
+  useEffect(()=>{ lsSet("ac4_idef", idef);      },[idef]);
+  useEffect(()=>{ lsSet("ac4_ent",  entradas);  },[entradas]);
+  useEffect(()=>{ lsSet("ac4_fic",  fichas);    },[fichas]);
+  useEffect(()=>{ lsSet("ac4_mar",  margens);   },[margens]);
+  useEffect(()=>{ lsSet("ac4_pre",  precos);    },[precos]);
+  useEffect(()=>{ lsSet("ac4_des",  despesas);  },[despesas]);
+  useEffect(()=>{ lsSet("ac4_prod", producoes); },[producoes]);
+  useEffect(()=>{ lsSet("ac4_ped",  pedidos);   },[pedidos]);
+  useEffect(()=>{ lsSet("ac4_ven",  vendas);    },[vendas]);
 
   function custMedioFn(iid) { const es=entradas.filter(e=>e.insumoId===iid); const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0); return tQ>0?tC/tQ:0; }
   function estoqueInsumoFn(iid) { const ins=idef.find(i=>i.id===iid);if(!ins)return 0; const tE=entradas.filter(e=>e.insumoId===iid).reduce((s,e)=>s+e.qtd,0); const tC=producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0); return tE-tC; }
@@ -822,7 +811,7 @@ export default function App() {
 
   if (!currentUser) return <LoginScreen usuarios={usuarios} onLogin={u=>{setCurrentUser(u);setTab(PERMS[u.role].tabs[0]);}} />;
 
-  const role=currentUser.role, perm=PERMS[role];
+  const role=currentUser.role,perm=PERMS[role];
   const visibleTabs=ALL_TABS.map((t,i)=>({label:t,idx:i,badge:ALL_BADGES[i]})).filter(t=>canTab(role,t.idx));
 
   return (
