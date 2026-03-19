@@ -7,12 +7,13 @@ const fP = v => `${(+v || 0).toFixed(1)}%`;
 const UNITS = ["kg", "g", "litro", "L", "ml", "unidade", "cx", "pct"];
 const COLORS = ["#7c3aed", "#8b5cf6", "#a78bfa", "#6d28d9", "#c4b5fd", "#4c1d95", "#5b21b6"];
 const CANAIS = ["Presencial", "WhatsApp", "Instagram", "iFood", "Telefone", "Outro"];
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const COMPAT = { kg:["kg","g"],g:["g","kg"],litro:["litro","L","ml"],L:["litro","L","ml"],ml:["ml","litro","L"],unidade:["unidade"],cx:["cx"],pct:["pct"] };
 const FACTORS = { kg:1,g:0.001,litro:1,L:1,ml:0.001 };
 const cvt = (qty, from, to) => { if (from===to) return qty; const f=FACTORS[from],t=FACTORS[to]; return (f!=null&&t!=null)?qty*f/t:qty; };
 const compatUnits = base => COMPAT[base] || [base];
 
-const ROLES = { Admin: "Admin", Comprador: "Comprador", Vendedor: "Vendedor" };
+const ROLES = { Admin:"Admin", Comprador:"Comprador", Vendedor:"Vendedor" };
 const ROLE_COLORS = { Admin:{bg:"#ede9fe",color:"#5b21b6"},Comprador:{bg:"#dbeafe",color:"#1e40af"},Vendedor:{bg:"#dcfce7",color:"#166534"} };
 const PERMS = {
   Admin:     { tabs:[0,1,2,3,4,5,6,7,8,9,10,11], editPrecos:true,  canConfirmarPedido:true  },
@@ -21,12 +22,11 @@ const PERMS = {
 };
 const canTab = (role, idx) => PERMS[role]?.tabs.includes(idx) ?? false;
 
-// ── localStorage helpers ─────────────────────────────────────────────────
 function lsGet(key, def) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
 }
 function lsSet(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("localStorage erro:", e); }
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) { console.warn("localStorage erro:", e); }
 }
 
 const S = {
@@ -92,7 +92,6 @@ function LoginScreen({ usuarios, onLogin }) {
         </div>
         {err && <p style={{ margin:"0 0 14px",fontSize:13,color:"#ef4444",background:"#fef2f2",padding:"8px 12px",borderRadius:8 }}>⚠️ {err}</p>}
         <button style={{ ...S.btn,width:"100%",padding:12,fontSize:15 }} onClick={tentar}>Entrar</button>
-
       </div>
     </div>
   );
@@ -595,23 +594,111 @@ function DespesasTab({ despesas, setDespesas }) {
 }
 
 // ── DRE ──────────────────────────────────────────────────────────────────
-function DRETab({ recBruta, cmv, lucBruto, totDesp, lucOp, mbPct, moPct, despesas }) {
-  function exportCSV() { const rows=[["Descrição","Valor (R$)","% Receita"],["Receita Bruta",recBruta.toFixed(2),"100.0%"],["(-) CMV",(-cmv).toFixed(2),recBruta>0?fP(-cmv/recBruta*100):"-"],["(=) Lucro Bruto",lucBruto.toFixed(2),fP(mbPct)],...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),recBruta>0?fP(-d.valor/recBruta*100):"-"]),["(=) Lucro Operacional",lucOp.toFixed(2),fP(moPct)]]; const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n"));a.download="DRE_AcaiControl.csv";a.click(); }
-  function Row({ label,value,indent=0,bold=false,color,bg,sep }) { return(<tr style={{ background:bg,borderTop:sep?"2px solid #ddd6fe":"none" }}><td style={{ ...S.td,paddingLeft:16+indent*20,fontWeight:bold?700:400,color:color||"#374151",fontSize:bold?15:14 }}>{label}</td><td style={{ ...S.td,textAlign:"right",fontWeight:bold?700:500,color:color||"#374151",fontSize:bold?15:14 }}>{fR(value)}</td><td style={{ ...S.td,textAlign:"right",fontSize:13,color:"#9ca3af" }}>{recBruta>0?fP(value/recBruta*100):"—"}</td></tr>); }
+function DRETab({ vendas, fichasCalc, getPreco, despesas }) {
+  const now = new Date();
+  const [mes, setMes] = useState(now.getMonth() + 1);
+  const [ano, setAno] = useState(now.getFullYear());
+  const [filtroAtivo, setFiltroAtivo] = useState(false);
+
+  const anosDisp = [...new Set(vendas.map(v => v.data?.slice(0,4)).filter(Boolean))].sort();
+
+  const vendasFiltradas = filtroAtivo
+    ? vendas.filter(v => {
+        if (!v.data) return false;
+        const [y, m] = v.data.split("-");
+        return +m === mes && +y === ano;
+      })
+    : vendas;
+
+  const recBruta = vendasFiltradas.reduce((s,v) => s + v.qtd * getPreco(v.fichaId), 0);
+  const cmv = vendasFiltradas.reduce((s,v) => { const f=fichasCalc.find(p=>p.id===v.fichaId); return s+(f?v.qtd*f.custo:0); }, 0);
+  const lucBruto = recBruta - cmv;
+  const totDesp = despesas.reduce((s,d) => s+(+d.valor||0), 0);
+  const lucOp = lucBruto - totDesp;
+  const mbPct = recBruta > 0 ? lucBruto/recBruta*100 : 0;
+  const moPct = recBruta > 0 ? lucOp/recBruta*100 : 0;
+  const periodoLabel = filtroAtivo ? `${MESES[mes-1]}/${ano}` : "Todo o período";
+
+  function exportCSV() {
+    const rows=[["Período",periodoLabel,""],["Descrição","Valor (R$)","% Receita"],["Receita Bruta",recBruta.toFixed(2),"100.0%"],["(-) CMV",(-cmv).toFixed(2),recBruta>0?fP(-cmv/recBruta*100):"-"],["(=) Lucro Bruto",lucBruto.toFixed(2),fP(mbPct)],...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),recBruta>0?fP(-d.valor/recBruta*100):"-"]),["(=) Lucro Operacional",lucOp.toFixed(2),fP(moPct)]];
+    const a=document.createElement("a"); a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n")); a.download=`DRE_NaGarrafa_${periodoLabel.replace("/","_")}.csv`; a.click();
+  }
+
+  function Row({ label, value, indent=0, bold=false, color, bg, sep }) {
+    return (
+      <tr style={{ background:bg, borderTop:sep?"2px solid #ddd6fe":"none" }}>
+        <td style={{ ...S.td, paddingLeft:16+indent*20, fontWeight:bold?700:400, color:color||"#374151", fontSize:bold?15:14 }}>{label}</td>
+        <td style={{ ...S.td, textAlign:"right", fontWeight:bold?700:500, color:color||"#374151", fontSize:bold?15:14 }}>{fR(value)}</td>
+        <td style={{ ...S.td, textAlign:"right", fontSize:13, color:"#9ca3af" }}>{recBruta>0?fP(value/recBruta*100):"—"}</td>
+      </tr>
+    );
+  }
+
   return (
     <>
-      <G cols="repeat(4,1fr)" gap={12} mb={20}><KPI label="💵 Receita Bruta" value={fR(recBruta)} color="#059669"/><KPI label="📈 Lucro Bruto" value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"}/><KPI label="📊 Margem Bruta" value={fP(mbPct)} color={mbPct>=0?"#6d28d9":"#ef4444"}/><KPI label="🏆 Lucro Operacional" value={fR(lucOp)} color={lucOp>=0?"#1d4ed8":"#ef4444"}/></G>
-      <Card title="📊 DRE — Demonstrativo de Resultado" right={<button style={S.btn2} onClick={exportCSV}>📥 Exportar CSV</button>}>
-        <table style={{ width:"100%",borderCollapse:"collapse" }}>
-          <thead><tr style={{ background:"#4c1d95" }}>{["Descrição","Valor (R$)","% Receita"].map(h=><th key={h} style={{ ...S.th,background:"#4c1d95",color:"white",textAlign:h!=="Descrição"?"right":"left" }}>{h}</th>)}</tr></thead>
+      <Card title="🗓️ Filtro de Período">
+        <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <input type="checkbox" id="filtroAtivo" checked={filtroAtivo} onChange={e => setFiltroAtivo(e.target.checked)} style={{ width:16, height:16, accentColor:"#7c3aed", cursor:"pointer" }} />
+            <label htmlFor="filtroAtivo" style={{ fontSize:14, fontWeight:600, color:"#3730a3", cursor:"pointer" }}>Filtrar por período</label>
+          </div>
+          <div style={{ display:"flex", gap:8, opacity:filtroAtivo?1:.4, pointerEvents:filtroAtivo?"auto":"none" }}>
+            <div>
+              <Lbl s="Mês" />
+              <select style={{ ...S.inp, width:150 }} value={mes} onChange={e => setMes(+e.target.value)}>
+                {MESES.map((m,i) => <option key={i+1} value={i+1}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <Lbl s="Ano" />
+              <select style={{ ...S.inp, width:100 }} value={ano} onChange={e => setAno(+e.target.value)}>
+                {[...new Set([...anosDisp, String(now.getFullYear())])].sort().map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginLeft:8, marginTop:16 }}>
+            <span style={{ fontSize:13, background:filtroAtivo?"#ede9fe":"#f3f4f6", color:filtroAtivo?"#5b21b6":"#6b7280", padding:"6px 14px", borderRadius:20, fontWeight:600 }}>
+              {filtroAtivo ? `📅 Exibindo: ${periodoLabel}` : "📅 Exibindo: Todo o período"}
+            </span>
+          </div>
+          {filtroAtivo && (
+            <div style={{ marginTop:16 }}>
+              <span style={{ fontSize:13, color:"#059669", background:"#ecfdf5", padding:"6px 14px", borderRadius:20 }}>
+                🧾 {vendasFiltradas.length} venda(s) no período
+              </span>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <G cols="repeat(4,1fr)" gap={12} mb={20}>
+        <KPI label="💵 Receita Bruta" value={fR(recBruta)} color="#059669" />
+        <KPI label="📈 Lucro Bruto" value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"} />
+        <KPI label="📊 Margem Bruta" value={fP(mbPct)} color={mbPct>=0?"#6d28d9":"#ef4444"} />
+        <KPI label="🏆 Lucro Operacional" value={fR(lucOp)} color={lucOp>=0?"#1d4ed8":"#ef4444"} />
+      </G>
+
+      <Card title={`📊 DRE — ${periodoLabel}`} right={<button style={S.btn2} onClick={exportCSV}>📥 Exportar CSV</button>}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead>
+            <tr style={{ background:"#4c1d95" }}>
+              {["Descrição","Valor (R$)","% Receita"].map(h => (
+                <th key={h} style={{ ...S.th, background:"#4c1d95", color:"white", textAlign:h!=="Descrição"?"right":"left" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
-            <Row label="(+) RECEITA BRUTA" value={recBruta} bold color="#059669" bg="#f0fdf4"/>
-            <Row label="(-) CMV" value={-cmv} indent={1} color="#dc2626"/>
-            <Row label="(=) LUCRO BRUTO" value={lucBruto} bold bg="#f5f3ff" sep color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
-            <Row label="(-) DESPESAS OPERACIONAIS" value={-totDesp} bold color="#d97706" sep/>
-            {despesas.map(d=><Row key={d.id} label={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} value={-d.valor} indent={2}/>)}
-            <Row label="(=) LUCRO OPERACIONAL" value={lucOp} bold bg={lucOp>=0?"#ecfdf5":"#fef2f2"} sep color={lucOp>=0?"#059669":"#ef4444"}/>
-            <tr style={{ background:"#f5f3ff" }}><td style={{ ...S.td,fontWeight:700,color:"#3730a3" }}>📐 Margem Operacional</td><td style={{ ...S.td,textAlign:"right",fontWeight:700,color:moPct>=0?"#7c3aed":"#ef4444",fontSize:16 }}>{fP(moPct)}</td><td style={S.td}/></tr>
+            <Row label="(+) RECEITA BRUTA" value={recBruta} bold color="#059669" bg="#f0fdf4" />
+            <Row label="(-) CMV — Custo das Mercadorias Vendidas" value={-cmv} indent={1} color="#dc2626" />
+            <Row label="(=) LUCRO BRUTO" value={lucBruto} bold bg="#f5f3ff" sep color={lucBruto>=0?"#7c3aed":"#ef4444"} />
+            <Row label="(-) DESPESAS OPERACIONAIS" value={-totDesp} bold color="#d97706" sep />
+            {despesas.map(d => <Row key={d.id} label={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} value={-d.valor} indent={2} />)}
+            <Row label="(=) LUCRO OPERACIONAL" value={lucOp} bold bg={lucOp>=0?"#ecfdf5":"#fef2f2"} sep color={lucOp>=0?"#059669":"#ef4444"} />
+            <tr style={{ background:"#f5f3ff" }}>
+              <td style={{ ...S.td, fontWeight:700, color:"#3730a3" }}>📐 Margem Operacional</td>
+              <td style={{ ...S.td, textAlign:"right", fontWeight:700, color:moPct>=0?"#7c3aed":"#ef4444", fontSize:16 }}>{fP(moPct)}</td>
+              <td style={S.td} />
+            </tr>
           </tbody>
         </table>
       </Card>
@@ -644,24 +731,21 @@ function DashboardTab({ fichasCalc, vendas, margens, getPreco, recBruta, lucOp, 
 
 // ── APP PRINCIPAL ─────────────────────────────────────────────────────────
 const DEFAULT_ADMIN = [{ id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true }];
-const STORAGE_KEYS = ["ac4_usr","ac4_idef","ac4_ent","ac4_fic","ac4_mar","ac4_pre","ac4_des","ac4_prod","ac4_ped","ac4_ven"];
-const STORAGE_DEFS = [DEFAULT_ADMIN,[],[],{},{},{},[],[],[],[]];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [tab, setTab] = useState(0);
-  const [usuarios, setUsuarios]     = useState(() => lsGet("ac4_usr", DEFAULT_ADMIN));
-  const [idef, setIdef]             = useState(() => lsGet("ac4_idef", []));
-  const [entradas, setEntradas]     = useState(() => lsGet("ac4_ent", []));
-  const [fichas, setFichas]         = useState(() => lsGet("ac4_fic", []));
-  const [margens, setMargens]       = useState(() => lsGet("ac4_mar", {}));
-  const [precos, setPrecos]         = useState(() => lsGet("ac4_pre", {}));
-  const [despesas, setDespesas]     = useState(() => lsGet("ac4_des", []));
-  const [producoes, setProducoes]   = useState(() => lsGet("ac4_prod", []));
-  const [pedidos, setPedidos]       = useState(() => lsGet("ac4_ped", []));
-  const [vendas, setVendas]         = useState(() => lsGet("ac4_ven", []));
+  const [usuarios, setUsuarios]   = useState(() => lsGet("ac4_usr", DEFAULT_ADMIN));
+  const [idef, setIdef]           = useState(() => lsGet("ac4_idef", []));
+  const [entradas, setEntradas]   = useState(() => lsGet("ac4_ent", []));
+  const [fichas, setFichas]       = useState(() => lsGet("ac4_fic", []));
+  const [margens, setMargens]     = useState(() => lsGet("ac4_mar", {}));
+  const [precos, setPrecos]       = useState(() => lsGet("ac4_pre", {}));
+  const [despesas, setDespesas]   = useState(() => lsGet("ac4_des", []));
+  const [producoes, setProducoes] = useState(() => lsGet("ac4_prod", []));
+  const [pedidos, setPedidos]     = useState(() => lsGet("ac4_ped", []));
+  const [vendas, setVendas]       = useState(() => lsGet("ac4_ven", []));
 
-  // persist to localStorage whenever state changes
   useEffect(() => { lsSet("ac4_usr",  usuarios);  }, [usuarios]);
   useEffect(() => { lsSet("ac4_idef", idef);      }, [idef]);
   useEffect(() => { lsSet("ac4_ent",  entradas);  }, [entradas]);
@@ -683,15 +767,14 @@ export default function App() {
 
   const recBruta=vendas.reduce((s,v)=>s+v.qtd*getPreco(v.fichaId),0);
   const cmv=vendas.reduce((s,v)=>{const f=fichasCalc.find(p=>p.id===v.fichaId);return s+(f?v.qtd*f.custo:0);},0);
-  const lucBruto=recBruta-cmv,totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0),lucOp=lucBruto-totDesp;
-  const mbPct=recBruta>0?lucBruto/recBruta*100:0,moPct=recBruta>0?lucOp/recBruta*100:0;
+  const lucBruto=recBruta-cmv, totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0), lucOp=lucBruto-totDesp;
 
   const ALL_TABS=["🧂 Insumos","📥 Compras","📦 Estoque","📋 Fichas","💰 Preços","🏭 Produção","📝 Pedidos","🛒 Vendas","🏢 Despesas","📊 DRE","🎯 Dashboard","👥 Usuários"];
   const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length];
 
   if (!currentUser) return <LoginScreen usuarios={usuarios} onLogin={u=>{setCurrentUser(u);setTab(PERMS[u.role].tabs[0]);}} />;
 
-  const role=currentUser.role,perm=PERMS[role];
+  const role=currentUser.role, perm=PERMS[role];
   const visibleTabs=ALL_TABS.map((t,i)=>({label:t,idx:i,badge:ALL_BADGES[i]})).filter(t=>canTab(role,t.idx));
 
   return (
