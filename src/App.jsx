@@ -640,7 +640,13 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
     ?vendas.filter(v=>{if(!v.data)return false;const[y,m]=v.data.split("-");return +m===mes&&+y===ano;})
     :vendas;
 
-  const recProd  = vf.reduce((s,v)=>s+v.qtd*getPreco(v.fichaId),0);
+  // Receita por produto
+  const recPorProd = fichasCalc.map(fc => {
+    const vProd = vf.filter(v => v.fichaId === fc.id);
+    const recProd = vProd.reduce((s,v) => s + v.qtd * getPreco(v.fichaId), 0);
+    const qtdVend = vProd.reduce((s,v) => s + v.qtd, 0);
+    return { id: fc.id, nome: fc.nome, rec: recProd, qtd: qtdVend };
+  }).filter(p => p.qtd > 0);
   const recTele  = vf.reduce((s,v)=>s+(v.teleValor||0),0);
   const recTotal = recProd+recTele;
   const cmv      = vf.reduce((s,v)=>{const f=fichasCalc.find(p=>p.id===v.fichaId);return s+(f?v.qtd*f.custo:0);},0);
@@ -726,8 +732,11 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
             </tr>
           </thead>
           <tbody>
-            <DreRow lbl="(+) RECEITA DE PRODUTOS"          val={recProd}  bold color="#059669" bg="rgba(5,150,105,.06)"/>
-            {recTele>0&&<DreRow lbl="(+) RECEITA DE TELE ENTREGA"     val={recTele}  bold color="#059669" bg="rgba(5,150,105,.04)"/>}
+            <DreRow lbl="(+) FATURAMENTO DE PRODUTOS"        val={recProd}  bold color="#059669" bg="rgba(5,150,105,.06)"/>
+            {recPorProd.map(p=>(
+              <DreRow key={p.id} lbl={`↳ ${p.nome} (${p.qtd} un)`} val={p.rec} indent={1} color="#059669"/>
+            ))}
+            {recTele>0&&<DreRow lbl="(+) RECEITA DE TELE ENTREGA"        val={recTele}  bold color="#059669" bg="rgba(5,150,105,.04)"/>}
             <DreRow lbl="(=) RECEITA TOTAL"                val={recTotal} bold color="#059669" bg="rgba(5,150,105,.09)" sep/>
             <DreRow lbl="(-) CMV — Custo das Mercadorias"  val={-cmv}     indent={1} color="#ef4444"/>
             {totEmb>0&&<DreRow lbl="(-) Custos de Embalagem"           val={-totEmb}  indent={1} color="#ef4444"/>}
