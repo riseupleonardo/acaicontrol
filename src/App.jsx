@@ -16,9 +16,9 @@ const compatUnits = base => COMPAT[base]||[base];
 const ROLES = {Admin:"Admin",Comprador:"Comprador",Vendedor:"Vendedor"};
 const ROLE_COLORS = {Admin:{bg:"#ede9fe",color:"#5b21b6"},Comprador:{bg:"#dbeafe",color:"#1e40af"},Vendedor:{bg:"#dcfce7",color:"#166534"}};
 const PERMS = {
-  Admin:     {tabs:[0,1,2,3,4,5,6,7,8,9,10,11],editPrecos:true, canConfirmarPedido:true},
-  Comprador: {tabs:[1,2,5,6,7],                 editPrecos:false,canConfirmarPedido:true},
-  Vendedor:  {tabs:[4,6],                       editPrecos:false,canConfirmarPedido:false},
+  Admin:     {tabs:[0,1,2,3,4,5,6,7,8,9,10,11,12],editPrecos:true, canConfirmarPedido:true},
+  Comprador: {tabs:[1,2,5,6,7,12],                 editPrecos:false,canConfirmarPedido:true},
+  Vendedor:  {tabs:[4,6],                          editPrecos:false,canConfirmarPedido:false},
 };
 const canTab = (role,idx) => PERMS[role]?.tabs.includes(idx)??false;
 
