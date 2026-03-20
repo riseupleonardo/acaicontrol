@@ -64,17 +64,9 @@ function KPI({label,value,sub,color="#3730a3"}){
   );
 }
 
-// ── LOGIN ─────────────────────────────────────────────────────────────────
 function LoginScreen({usuarios,onLogin}){
-  const [user,setUser]=useState("");
-  const [pass,setPass]=useState("");
-  const [err,setErr]=useState("");
-  function tentar(){
-    const u=usuarios.find(u=>u.nome.toLowerCase()===user.toLowerCase()&&u.senha===pass);
-    if(!u){setErr("Usuário ou senha incorretos.");return;}
-    if(!u.ativo){setErr("Usuário inativo. Contate o administrador.");return;}
-    onLogin(u);
-  }
+  const [user,setUser]=useState("");const [pass,setPass]=useState("");const [err,setErr]=useState("");
+  function tentar(){const u=usuarios.find(u=>u.nome.toLowerCase()===user.toLowerCase()&&u.senha===pass);if(!u){setErr("Usuário ou senha incorretos.");return;}if(!u.ativo){setErr("Usuário inativo.");return;}onLogin(u);}
   return(
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#020208,#080518)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",background:"radial-gradient(circle,rgba(124,58,237,.15),transparent 70%)",top:"20%",left:"30%",pointerEvents:"none"}}/>
@@ -83,16 +75,10 @@ function LoginScreen({usuarios,onLogin}){
         <div style={{textAlign:"center",marginBottom:32}}>
           <div style={{fontSize:60,filter:"drop-shadow(0 0 20px rgba(124,58,237,.6))"}}>🫐</div>
           <h1 style={{margin:"12px 0 6px",fontSize:28,fontWeight:800,color:"#fff",letterSpacing:"-1px"}}>NaGarrafa</h1>
-          <p style={{margin:0,fontSize:13,color:"rgba(255,255,255,.45)",letterSpacing:".5px"}}>Sistema de Gestão</p>
+          <p style={{margin:0,fontSize:13,color:"rgba(255,255,255,.45)"}}>Sistema de Gestão</p>
         </div>
-        <div style={{marginBottom:14}}>
-          <label style={{fontSize:12,color:"rgba(255,255,255,.5)",display:"block",marginBottom:5,fontWeight:500,letterSpacing:".5px",textTransform:"uppercase"}}>Usuário</label>
-          <input style={{...S.inp,background:"rgba(255,255,255,.07)",border:"1px solid rgba(124,58,237,.35)",color:"#fff",borderRadius:10}} placeholder="Nome de usuário" value={user} onChange={e=>{setUser(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&tentar()}/>
-        </div>
-        <div style={{marginBottom:24}}>
-          <label style={{fontSize:12,color:"rgba(255,255,255,.5)",display:"block",marginBottom:5,fontWeight:500,letterSpacing:".5px",textTransform:"uppercase"}}>Senha</label>
-          <input style={{...S.inp,background:"rgba(255,255,255,.07)",border:"1px solid rgba(124,58,237,.35)",color:"#fff",borderRadius:10}} type="password" placeholder="••••••••" value={pass} onChange={e=>{setPass(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&tentar()}/>
-        </div>
+        <div style={{marginBottom:14}}><label style={{fontSize:12,color:"rgba(255,255,255,.5)",display:"block",marginBottom:5,fontWeight:500,textTransform:"uppercase"}}>Usuário</label><input style={{...S.inp,background:"rgba(255,255,255,.07)",border:"1px solid rgba(124,58,237,.35)",color:"#fff",borderRadius:10}} placeholder="Nome de usuário" value={user} onChange={e=>{setUser(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&tentar()}/></div>
+        <div style={{marginBottom:24}}><label style={{fontSize:12,color:"rgba(255,255,255,.5)",display:"block",marginBottom:5,fontWeight:500,textTransform:"uppercase"}}>Senha</label><input style={{...S.inp,background:"rgba(255,255,255,.07)",border:"1px solid rgba(124,58,237,.35)",color:"#fff",borderRadius:10}} type="password" placeholder="••••••••" value={pass} onChange={e=>{setPass(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&tentar()}/></div>
         {err&&<p style={{margin:"0 0 16px",fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,.15)",padding:"10px 14px",borderRadius:10,border:"1px solid rgba(239,68,68,.3)"}}>⚠️ {err}</p>}
         <button style={{...S.btn,width:"100%",padding:13,fontSize:15,borderRadius:10,background:"linear-gradient(135deg,#7c3aed,#5b21b6)",boxShadow:"0 4px 20px rgba(124,58,237,.4)"}} onClick={tentar}>Entrar</button>
       </div>
@@ -100,18 +86,9 @@ function LoginScreen({usuarios,onLogin}){
   );
 }
 
-// ── USUÁRIOS ──────────────────────────────────────────────────────────────
 function UsuariosTab({usuarios,setUsuarios,currentUser}){
-  const blank={nome:"",senha:"",role:"Vendedor",ativo:true};
-  const [f,setF]=useState(blank);const [eid,setEid]=useState(null);const [showPass,setShowPass]=useState({});
-  function salvar(){
-    if(!f.nome.trim())return alert("Informe o nome.");
-    if(!eid&&!f.senha.trim())return alert("Informe a senha.");
-    if(!eid&&usuarios.find(u=>u.nome.toLowerCase()===f.nome.toLowerCase()))return alert("Usuário já existe.");
-    const it=eid?usuarios.find(u=>u.id===eid):{id:uid()};
-    const up={...it,nome:f.nome.trim(),role:f.role,ativo:f.ativo,...(f.senha?{senha:f.senha}:{})};
-    setUsuarios(eid?usuarios.map(u=>u.id===eid?up:u):[...usuarios,up]);setF(blank);setEid(null);
-  }
+  const blank={nome:"",senha:"",role:"Vendedor",ativo:true};const [f,setF]=useState(blank);const [eid,setEid]=useState(null);const [showPass,setShowPass]=useState({});
+  function salvar(){if(!f.nome.trim())return alert("Informe o nome.");if(!eid&&!f.senha.trim())return alert("Informe a senha.");if(!eid&&usuarios.find(u=>u.nome.toLowerCase()===f.nome.toLowerCase()))return alert("Usuário já existe.");const it=eid?usuarios.find(u=>u.id===eid):{id:uid()};const up={...it,nome:f.nome.trim(),role:f.role,ativo:f.ativo,...(f.senha?{senha:f.senha}:{})};setUsuarios(eid?usuarios.map(u=>u.id===eid?up:u):[...usuarios,up]);setF(blank);setEid(null);}
   function editar(u){setF({nome:u.nome,senha:"",role:u.role,ativo:u.ativo});setEid(u.id);}
   function remover(id){if(id===currentUser.id)return alert("Não pode remover seu próprio usuário.");if(window.confirm("Remover?"))setUsuarios(usuarios.filter(u=>u.id!==id));}
   function toggle(id){if(id===currentUser.id)return alert("Não pode desativar seu próprio usuário.");setUsuarios(usuarios.map(u=>u.id===id?{...u,ativo:!u.ativo}:u));}
@@ -128,33 +105,28 @@ function UsuariosTab({usuarios,setUsuarios,currentUser}){
     <Card title="🔐 Matriz de Permissões">
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
         <thead><tr><th style={S.th}>Funcionalidade</th>{Object.keys(ROLES).map(r=><th key={r} style={{...S.th,textAlign:"center"}}><Pill label={r} color={ROLE_COLORS[r].color} bg={ROLE_COLORS[r].bg}/></th>)}</tr></thead>
-        <tbody>
-          {[["🧂 Insumos / 📋 Fichas",true,false,false],["📥 Compras",true,true,false],["📦 Estoque",true,true,false],["🏭 Produção",true,true,false],["💰 Preços — Editar",true,false,false],["💰 Preços — Visualizar",true,false,true],["📝 Pedidos",true,true,true],["🛒 Vendas",true,true,false],["✅ Confirmar Pedidos",true,true,false],["🏢 Despesas",true,false,false],["📊 DRE / 🎯 Dashboard",true,false,false],["👥 Gerenciar Usuários",true,false,false]].map(([label,a,b,c])=>(
-            <tr key={label}><td style={{...S.td,fontWeight:500}}>{label}</td>{[a,b,c].map((v,i)=><td key={i} style={{...S.td,textAlign:"center"}}>{v?"✅":<span style={{color:"var(--border4)"}}>—</span>}</td>)}</tr>
-          ))}
-        </tbody>
+        <tbody>{[["🧂 Insumos / 📋 Fichas",true,false,false],["📥 Compras",true,true,false],["📦 Estoque",true,true,false],["🏭 Produção",true,true,false],["💰 Preços — Editar",true,false,false],["💰 Preços — Visualizar",true,false,true],["📝 Pedidos",true,true,true],["🛒 Vendas",true,true,false],["✅ Confirmar Pedidos",true,true,false],["🏢 Despesas",true,false,false],["📊 DRE / 🎯 Dashboard",true,false,false],["👥 Gerenciar Usuários",true,false,false]].map(([label,a,b,c])=>(
+          <tr key={label}><td style={{...S.td,fontWeight:500}}>{label}</td>{[a,b,c].map((v,i)=><td key={i} style={{...S.td,textAlign:"center"}}>{v?"✅":<span style={{color:"var(--border4)"}}>—</span>}</td>)}</tr>
+        ))}</tbody>
       </table>
     </Card>
     <Card title={`👥 Usuários (${usuarios.length})`}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
         <thead><tr>{["Usuário","Perfil","Senha","Status","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
-        <tbody>
-          {usuarios.map(u=>(
-            <tr key={u.id}>
-              <td style={{...S.td,fontWeight:600}}>{u.nome}{u.id===currentUser.id&&<span style={{fontSize:11,color:"#7c3aed",background:"var(--accent-soft)",padding:"1px 6px",borderRadius:10,marginLeft:4}}>você</span>}</td>
-              <td style={S.td}><Pill label={u.role} color={ROLE_COLORS[u.role].color} bg={ROLE_COLORS[u.role].bg}/></td>
-              <td style={S.td}><span style={{fontFamily:"monospace",letterSpacing:2,color:"var(--text4)"}}>{showPass[u.id]?u.senha:"••••••"}</span><button style={{...S.bsm,marginLeft:6,fontSize:11}} onClick={()=>setShowPass(p=>({...p,[u.id]:!p[u.id]}))}>{showPass[u.id]?"🙈":"👁️"}</button></td>
-              <td style={S.td}><button onClick={()=>toggle(u.id)} style={{...S.bsm,background:u.ativo?"#dcfce7":"var(--card2)",color:u.ativo?"#065f46":"var(--text3)"}}>{u.ativo?"✅ Ativo":"⚪ Inativo"}</button></td>
-              <td style={S.td}><button style={S.bsm} onClick={()=>editar(u)}>✏️</button><button style={{...S.bsm,color:"#ef4444",marginLeft:6}} onClick={()=>remover(u.id)}>🗑️</button></td>
-            </tr>
-          ))}
-        </tbody>
+        <tbody>{usuarios.map(u=>(
+          <tr key={u.id}>
+            <td style={{...S.td,fontWeight:600}}>{u.nome}{u.id===currentUser.id&&<span style={{fontSize:11,color:"#7c3aed",background:"var(--accent-soft)",padding:"1px 6px",borderRadius:10,marginLeft:4}}>você</span>}</td>
+            <td style={S.td}><Pill label={u.role} color={ROLE_COLORS[u.role].color} bg={ROLE_COLORS[u.role].bg}/></td>
+            <td style={S.td}><span style={{fontFamily:"monospace",letterSpacing:2,color:"var(--text4)"}}>{showPass[u.id]?u.senha:"••••••"}</span><button style={{...S.bsm,marginLeft:6,fontSize:11}} onClick={()=>setShowPass(p=>({...p,[u.id]:!p[u.id]}))}>{showPass[u.id]?"🙈":"👁️"}</button></td>
+            <td style={S.td}><button onClick={()=>toggle(u.id)} style={{...S.bsm,background:u.ativo?"#dcfce7":"var(--card2)",color:u.ativo?"#065f46":"var(--text3)"}}>{u.ativo?"✅ Ativo":"⚪ Inativo"}</button></td>
+            <td style={S.td}><button style={S.bsm} onClick={()=>editar(u)}>✏️</button><button style={{...S.bsm,color:"#ef4444",marginLeft:6}} onClick={()=>remover(u.id)}>🗑️</button></td>
+          </tr>
+        ))}</tbody>
       </table>
     </Card>
   </>);
 }
 
-// ── INSUMOS ───────────────────────────────────────────────────────────────
 function InsumosDefTab({idef,setIdef}){
   const blank={nome:"",unidade:"kg"};const [f,setF]=useState(blank);const [eid,setEid]=useState(null);
   function salvar(){if(!f.nome.trim())return alert("Informe o nome.");const it={id:eid||uid(),nome:f.nome.trim(),unidade:f.unidade};setIdef(eid?idef.map(i=>i.id===eid?it:i):[...idef,it]);setF(blank);setEid(null);}
@@ -179,20 +151,19 @@ function InsumosDefTab({idef,setIdef}){
   </>);
 }
 
-// ── COMPRAS ───────────────────────────────────────────────────────────────
 function ComprasTab({entradas,setEntradas,idef}){
   const today=new Date().toISOString().slice(0,10);
   const blank={insumoId:"",qtd:"",custoTotal:"",data:today};const [f,setF]=useState(blank);
   const ins=idef.find(i=>i.id===f.insumoId);
   const cuUnit=f.qtd&&+f.qtd>0&&f.custoTotal?+f.custoTotal/+f.qtd:null;
-  function cm(iid){const es=entradas.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
+  function cmAtual(iid){const es=entradas.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
   function novoCM(){const es=entradas.filter(e=>e.insumoId===f.insumoId);const tQ=es.reduce((s,e)=>s+e.qtd,0)+(+f.qtd||0),tC=es.reduce((s,e)=>s+e.custoTotal,0)+(+f.custoTotal||0);return tQ>0?tC/tQ:0;}
   function salvar(){if(!f.insumoId)return alert("Selecione o insumo.");if(!f.qtd||+f.qtd<=0)return alert("Informe a quantidade.");if(!f.custoTotal||+f.custoTotal<=0)return alert("Informe o valor pago.");setEntradas([...entradas,{id:uid(),insumoId:f.insumoId,qtd:+f.qtd,custoTotal:+f.custoTotal,data:f.data}]);setF({...blank,data:f.data});}
   return(<>
     {!idef.length&&<div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:14,marginBottom:16,color:"#92400e",fontSize:13}}>⚠️ Cadastre insumos antes de registrar compras.</div>}
     <Card title="📥 Registrar Compra">
       <G cols="2fr 1fr 1fr 1fr auto">
-        <div><Lbl s="Insumo *"/><select style={S.inp} value={f.insumoId} onChange={e=>setF({...f,insumoId:e.target.value})}><option value="">Selecione...</option>{idef.map(i=>{const c=cm(i.id);return<option key={i.id} value={i.id}>{i.nome} ({i.unidade}){c>0?" — CM: "+fR(c):""}</option>;})}</select></div>
+        <div><Lbl s="Insumo *"/><select style={S.inp} value={f.insumoId} onChange={e=>setF({...f,insumoId:e.target.value})}><option value="">Selecione...</option>{idef.map(i=>{const c=cmAtual(i.id);return<option key={i.id} value={i.id}>{i.nome} ({i.unidade}){c>0?" — CM: "+fR(c):""}</option>;})}</select></div>
         <div><Lbl s={`Qtd.${ins?" ("+ins.unidade+")":""} *`}/><input style={S.inp} type="number" step="0.001" min="0" value={f.qtd} onChange={e=>setF({...f,qtd:e.target.value})}/></div>
         <div><Lbl s="Valor pago (R$) *"/><input style={S.inp} type="number" step="0.01" min="0" value={f.custoTotal} onChange={e=>setF({...f,custoTotal:e.target.value})}/></div>
         <div><Lbl s="Data"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
@@ -200,7 +171,7 @@ function ComprasTab({entradas,setEntradas,idef}){
       </G>
       {cuUnit!==null&&ins&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:6}}>
         <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"5px 12px",borderRadius:8}}>💡 Custo desta compra: <strong>{fR(cuUnit)}/{ins.unidade}</strong></span>
-        {cm(f.insumoId)>0&&<span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.1)",padding:"5px 12px",borderRadius:8}}>📊 Novo CM: <strong>{fR(novoCM())}/{ins.unidade}</strong></span>}
+        {cmAtual(f.insumoId)>0&&<span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.1)",padding:"5px 12px",borderRadius:8}}>📊 Novo CM: <strong>{fR(novoCM())}/{ins.unidade}</strong></span>}
       </div>}
     </Card>
     <Card title={`📋 Histórico de Compras (${entradas.length})`}>
@@ -219,7 +190,6 @@ function ComprasTab({entradas,setEntradas,idef}){
   </>);
 }
 
-// ── ESTOQUE ───────────────────────────────────────────────────────────────
 function EstoqueTab({idefComCusto}){
   const totalValor=idefComCusto.reduce((s,i)=>s+Math.max(0,i.estoque)*i.custMedio,0);
   return(<>
@@ -251,7 +221,6 @@ function EstoqueTab({idefComCusto}){
   </>);
 }
 
-// ── FICHAS ────────────────────────────────────────────────────────────────
 function FichasTab({fichas,fichasCalc,setFichas,idef,custMedioFn}){
   const blank={nome:"",ings:[]};const [f,setF]=useState(blank);const [eid,setEid]=useState(null);
   const [nIng,setNIng]=useState({iid:"",qtd:"",un:""});
@@ -315,7 +284,6 @@ function FichasTab({fichas,fichasCalc,setFichas,idef,custMedioFn}){
   </>);
 }
 
-// ── PREÇOS ────────────────────────────────────────────────────────────────
 function PrecosTab({fichasCalc,margens,sm,getPreco,precos,sp,canEdit}){
   const [simFid,setSimFid]=useState("");const [simM,setSimM]=useState(40);
   useEffect(()=>{if(fichasCalc.length&&!simFid)setSimFid(fichasCalc[0].id);},[fichasCalc]);
@@ -374,7 +342,6 @@ function PrecosTab({fichasCalc,margens,sm,getPreco,precos,sp,canEdit}){
   </>);
 }
 
-// ── PRODUÇÃO ──────────────────────────────────────────────────────────────
 function ProducaoTab({producoes,setProducoes,fichasCalc,idef,estoqueInsumoFn,estoqueProdutoFn}){
   const today=new Date().toISOString().slice(0,10);
   const blank={fichaId:"",qtd:"",data:today};const [f,setF]=useState(blank);
@@ -427,7 +394,6 @@ function ProducaoTab({producoes,setProducoes,fichasCalc,idef,estoqueInsumoFn,est
   </>);
 }
 
-// ── PEDIDOS ───────────────────────────────────────────────────────────────
 function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,estoqueProdutoFn,canConfirmar}){
   const today=new Date().toISOString().slice(0,10);
   const blank={fichaId:"",qtd:"",data:today,canal:"Presencial",obs:""};
@@ -474,7 +440,6 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
   </>);
 }
 
-// ── VENDAS ────────────────────────────────────────────────────────────────
 function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,custMedioFn}){
   const today=new Date().toISOString().slice(0,10);
   const blank={fichaId:"",qtd:"",data:today,usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"",usaTele:false,teleValor:""};
@@ -509,7 +474,6 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
           </G>
           <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:10}}>
             <G cols="1fr 1fr 1fr" gap={16} mb={0}>
-              {/* EMBALAGEM */}
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                   <input type="checkbox" id="usaEmb" checked={f.usaEmbalagem} onChange={e=>setF({...f,usaEmbalagem:e.target.checked,embQtd:"",embInsumoId:""})} style={{width:16,height:16,accentColor:"#7c3aed",cursor:"pointer"}}/>
@@ -524,7 +488,6 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
                 {f.usaEmbalagem&&f.embInsumoId&&f.embQtd&&+f.embQtd>0&&cmEmb>0&&<div style={{marginTop:8,fontSize:13,background:"rgba(245,158,11,.1)",color:"#d97706",padding:"6px 12px",borderRadius:8}}>📦 {f.embQtd} un × {fR(cmEmb)} = <strong>{fR(custoEmb)}</strong></div>}
                 {f.usaEmbalagem&&f.embInsumoId&&cmEmb===0&&<p style={{fontSize:12,color:"#ef4444",marginTop:6}}>⚠️ Sem custo médio. Registre uma compra primeiro.</p>}
               </div>
-              {/* TELE ENTREGA */}
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                   <input type="checkbox" id="usaTele" checked={f.usaTele} onChange={e=>setF({...f,usaTele:e.target.checked,teleValor:""})} style={{width:16,height:16,accentColor:"#059669",cursor:"pointer"}}/>
@@ -538,7 +501,6 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
                   </>
                 )}
               </div>
-              {/* DESCONTO */}
               <div>
                 <Lbl s="🏷️ Desconto (R$)"/>
                 <input style={S.inp} type="number" step="0.01" min="0" placeholder="0,00" value={f.desconto} onChange={e=>setF({...f,desconto:e.target.value})}/>
@@ -571,8 +533,7 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
           {vendas.map(v=>{const fc=fichasCalc.find(p=>p.id===v.fichaId),pr=getPreco(v.fichaId),i2=idef.find(i=>i.id===v.embInsumoId);return(
             <tr key={v.id}>
               <td style={{...S.td,fontWeight:500}}>{fc?.nome||"—"}</td>
-              <td style={S.td}>{v.qtd} un</td>
-              <td style={S.td}>{fR(pr)}</td>
+              <td style={S.td}>{v.qtd} un</td><td style={S.td}>{fR(pr)}</td>
               <td style={{...S.td,fontWeight:700,color:"#059669"}}>{fR(v.qtd*pr)}</td>
               <td style={S.td}>{(v.teleValor||0)>0?<span style={{color:"#059669",fontWeight:600}}>🛵 {fR(v.teleValor)}</span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
               <td style={S.td}>{(v.embQtd||0)>0?<span style={{fontSize:12}}><span style={{color:"#d97706",fontWeight:600}}>📦 {v.embQtd} un</span><br/><span style={{color:"var(--text4)",fontSize:11}}>{i2?.nome||""} — {fR(v.embalagemCusto)}</span></span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
@@ -597,7 +558,6 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
   </>);
 }
 
-// ── DESPESAS ──────────────────────────────────────────────────────────────
 function DespesasTab({despesas,setDespesas}){
   const blank={descricao:"",tipo:"Fixa",valor:""};const [f,setF]=useState(blank);const [eid,setEid]=useState(null);
   function salvar(){if(!f.descricao.trim()||!f.valor||+f.valor<=0)return alert("Preencha todos os campos.");const it={id:eid||uid(),descricao:f.descricao.trim(),tipo:f.tipo,valor:+f.valor};setDespesas(eid?despesas.map(d=>d.id===eid?it:d):[...despesas,it]);setF(blank);setEid(null);}
@@ -636,66 +596,81 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
 
   const anosDisp=[...new Set(vendas.map(v=>v.data?.slice(0,4)).filter(Boolean))].sort();
 
-  const vf=filtroAtivo
-    ?vendas.filter(v=>{if(!v.data)return false;const[y,m]=v.data.split("-");return +m===mes&&+y===ano;})
-    :vendas;
+  // vendas filtradas pelo período
+  const vf = filtroAtivo
+    ? vendas.filter(v=>{ if(!v.data)return false; const[y,m]=v.data.split("-"); return +m===mes&&+y===ano; })
+    : vendas;
 
-  // Receita por produto
-  const recPorProd = fichasCalc.map(fc => {
-    const vProd = vf.filter(v => v.fichaId === fc.id);
-    const recProd = vProd.reduce((s,v) => s + v.qtd * getPreco(v.fichaId), 0);
-    const qtdVend = vProd.reduce((s,v) => s + v.qtd, 0);
-    return { id: fc.id, nome: fc.nome, rec: recProd, qtd: qtdVend };
-  }).filter(p => p.qtd > 0);
-  const recTele  = vf.reduce((s,v)=>s+(v.teleValor||0),0);
-  const recTotal = recProd+recTele;
-  const cmv      = vf.reduce((s,v)=>{const f=fichasCalc.find(p=>p.id===v.fichaId);return s+(f?v.qtd*f.custo:0);},0);
-  const totEmb   = vf.reduce((s,v)=>s+(v.embalagemCusto||0),0);
-  const totDesc  = vf.reduce((s,v)=>s+(v.desconto||0),0);
-  const lucBruto = recTotal-cmv-totEmb-totDesc;
-  const totDesp  = despesas.reduce((s,d)=>s+(+d.valor||0),0);
-  const lucOp    = lucBruto-totDesp;
-  const mbPct    = recTotal>0?lucBruto/recTotal*100:0;
-  const moPct    = recTotal>0?lucOp/recTotal*100:0;
-  const label    = filtroAtivo?`${MESES[mes-1]}/${ano}`:"Todo o período";
+  // receita por produto (sublinha gerencial)
+  const recPorProd = fichasCalc.map(fc=>{
+    const vProd=vf.filter(v=>v.fichaId===fc.id);
+    const rec=vProd.reduce((s,v)=>s+v.qtd*getPreco(fc.id),0);
+    const qtd=vProd.reduce((s,v)=>s+v.qtd,0);
+    return {id:fc.id, nome:fc.nome, rec, qtd};
+  }).filter(p=>p.qtd>0);
 
-  function pct(v){return recTotal>0?fP(v/recTotal*100):"—";}
+  const recProd  = recPorProd.reduce((s,p)=>s+p.rec, 0);
+  const recTele  = vf.reduce((s,v)=>s+(v.teleValor||0), 0);
+  const recTotal = recProd + recTele;
+  const cmv      = vf.reduce((s,v)=>{const f=fichasCalc.find(p=>p.id===v.fichaId);return s+(f?v.qtd*f.custo:0);}, 0);
+  const totEmb   = vf.reduce((s,v)=>s+(v.embalagemCusto||0), 0);
+  const totDesc  = vf.reduce((s,v)=>s+(v.desconto||0), 0);
+  const lucBruto = recTotal - cmv - totEmb - totDesc;
+  const totDesp  = despesas.reduce((s,d)=>s+(+d.valor||0), 0);
+  const lucOp    = lucBruto - totDesp;
+  const mbPct    = recTotal>0 ? lucBruto/recTotal*100 : 0;
+  const moPct    = recTotal>0 ? lucOp/recTotal*100    : 0;
+  const label    = filtroAtivo ? `${MESES[mes-1]}/${ano}` : "Todo o período";
+
+  function pct(v){ return recTotal>0 ? fP(v/recTotal*100) : "—"; }
 
   function exportCSV(){
     const rows=[
-      ["Período",label,""],["Descrição","Valor (R$)","% Receita"],
-      ["Receita de Produtos",recProd.toFixed(2),""],
-      ["(+) Receita Tele Entrega",recTele.toFixed(2),""],
-      ["(=) Receita Total",recTotal.toFixed(2),"100.0%"],
+      ["Período",label,""],
+      ["Descrição","Valor (R$)","% Receita Total"],
+      ["FATURAMENTO DE PRODUTOS",recProd.toFixed(2),pct(recProd)],
+      ...recPorProd.map(p=>[`  ↳ ${p.nome} (${p.qtd} un)`,p.rec.toFixed(2),pct(p.rec)]),
+      recTele>0?["RECEITA TELE ENTREGA",recTele.toFixed(2),pct(recTele)]:[],
+      ["RECEITA TOTAL",recTotal.toFixed(2),"100.0%"],
       ["(-) CMV",(-cmv).toFixed(2),pct(-cmv)],
-      ["(-) Embalagens",(-totEmb).toFixed(2),pct(-totEmb)],
-      ["(-) Descontos",(-totDesc).toFixed(2),pct(-totDesc)],
-      ["(=) Lucro Bruto",lucBruto.toFixed(2),fP(mbPct)],
+      totEmb>0?["(-) Embalagens",(-totEmb).toFixed(2),pct(-totEmb)]:[],
+      totDesc>0?["(-) Descontos",(-totDesc).toFixed(2),pct(-totDesc)]:[],
+      ["(=) LUCRO BRUTO",lucBruto.toFixed(2),fP(mbPct)],
       ...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),pct(-d.valor)]),
-      ["(=) Lucro Operacional",lucOp.toFixed(2),fP(moPct)],
-    ];
+      ["(=) LUCRO OPERACIONAL",lucOp.toFixed(2),fP(moPct)],
+    ].filter(r=>r.length>0);
     const a=document.createElement("a");
     a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n"));
     a.download=`DRE_NaGarrafa_${label.replace("/","_")}.csv`;
     a.click();
   }
 
-  function DreRow({lbl,val,indent=0,bold=false,color,bg,sep}){
-    const st={background:bg||"transparent",borderTop:sep?"2px solid var(--border3)":"none"};
-    const td1={...S.td,paddingLeft:16+indent*20,fontWeight:bold?700:400,color:color||"var(--text)",fontSize:bold?15:14};
-    const td2={...S.td,textAlign:"right",fontWeight:bold?700:500,color:color||"var(--text)",fontSize:bold?15:14};
-    const td3={...S.td,textAlign:"right",fontSize:13,color:"var(--text4)"};
+  // Componente linha do DRE
+  function DreRow({lbl,val,indent,bold,color,bg,sep}){
+    indent=indent||0; bold=bold||false; bg=bg||"transparent"; sep=sep||false;
     return(
-      <tr style={st}>
-        <td style={td1}>{lbl}</td>
-        <td style={td2}>{fR(val)}</td>
-        <td style={td3}>{pct(val)}</td>
+      <tr style={{background:bg,borderTop:sep?"2px solid var(--border3)":"none"}}>
+        <td style={{...S.td,paddingLeft:16+indent*18,fontWeight:bold?700:400,color:color||"var(--text)",fontSize:bold?15:14}}>{lbl}</td>
+        <td style={{...S.td,textAlign:"right",fontWeight:bold?700:500,color:color||"var(--text)",fontSize:bold?15:14}}>{fR(val)}</td>
+        <td style={{...S.td,textAlign:"right",fontSize:13,color:"var(--text4)"}}>{pct(val)}</td>
+      </tr>
+    );
+  }
+
+  // linha sublinha de produto (destaque menor)
+  function SubRow({nome,val,qtd}){
+    return(
+      <tr style={{background:"rgba(5,150,105,.02)"}}>
+        <td style={{...S.td,paddingLeft:34,fontSize:13,color:"var(--text3)"}}>↳ {nome} <span style={{color:"var(--text4)",fontSize:11}}>({qtd} un)</span></td>
+        <td style={{...S.td,textAlign:"right",fontSize:13,color:"#059669"}}>{fR(val)}</td>
+        <td style={{...S.td,textAlign:"right",fontSize:12,color:"var(--text4)"}}>{pct(val)}</td>
       </tr>
     );
   }
 
   return(
     <>
+      {/* Filtro */}
       <Card title="🗓️ Filtro de Período">
         <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -715,14 +690,16 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
         </div>
       </Card>
 
+      {/* KPIs */}
       <G cols="repeat(4,1fr)" gap={12} mb={20}>
-        <KPI label="💵 Receita Produtos" value={fR(recProd)}  color="#059669"/>
-        <KPI label="🛵 Receita Tele"    value={fR(recTele)}  color="#059669"/>
-        <KPI label="📈 Lucro Bruto"     value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
-        <KPI label="🏆 Lucro Operac."   value={fR(lucOp)}    color={lucOp>=0?"#1d4ed8":"#ef4444"}/>
+        <KPI label="💵 Faturamento Produtos" value={fR(recProd)}  color="#059669"/>
+        <KPI label="🛵 Receita Tele"         value={fR(recTele)}  color="#059669"/>
+        <KPI label="📈 Lucro Bruto"          value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
+        <KPI label="🏆 Lucro Operacional"    value={fR(lucOp)}    color={lucOp>=0?"#1d4ed8":"#ef4444"}/>
       </G>
 
-      <Card title={`📊 DRE — ${label}`} right={<button style={S.btn2} onClick={exportCSV}>📥 Exportar CSV</button>}>
+      {/* Tabela DRE */}
+      <Card title={`📊 DRE Gerencial — ${label}`} right={<button style={S.btn2} onClick={exportCSV}>📥 Exportar CSV</button>}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead>
             <tr style={{background:"#4c1d95"}}>
@@ -732,19 +709,26 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
             </tr>
           </thead>
           <tbody>
-            <DreRow lbl="(+) FATURAMENTO DE PRODUTOS"        val={recProd}  bold color="#059669" bg="rgba(5,150,105,.06)"/>
-            {recPorProd.map(p=>(
-              <DreRow key={p.id} lbl={`↳ ${p.nome} (${p.qtd} un)`} val={p.rec} indent={1} color="#059669"/>
-            ))}
-            {recTele>0&&<DreRow lbl="(+) RECEITA DE TELE ENTREGA"        val={recTele}  bold color="#059669" bg="rgba(5,150,105,.04)"/>}
-            <DreRow lbl="(=) RECEITA TOTAL"                val={recTotal} bold color="#059669" bg="rgba(5,150,105,.09)" sep/>
-            <DreRow lbl="(-) CMV — Custo das Mercadorias"  val={-cmv}     indent={1} color="#ef4444"/>
-            {totEmb>0&&<DreRow lbl="(-) Custos de Embalagem"           val={-totEmb}  indent={1} color="#ef4444"/>}
-            {totDesc>0&&<DreRow lbl="(-) Descontos Concedidos"         val={-totDesc} indent={1} color="#ef4444"/>}
-            <DreRow lbl="(=) LUCRO BRUTO"                  val={lucBruto} bold bg="var(--card2)" sep color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
-            <DreRow lbl="(-) DESPESAS OPERACIONAIS"        val={-totDesp} bold color="#d97706" sep/>
-            {despesas.map(d=><DreRow key={d.id} lbl={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} val={-d.valor} indent={2}/>)}
-            <DreRow lbl="(=) LUCRO OPERACIONAL"            val={lucOp}    bold bg={lucOp>=0?"rgba(5,150,105,.07)":"rgba(239,68,68,.07)"} sep color={lucOp>=0?"#059669":"#ef4444"}/>
+            {/* FATURAMENTO */}
+            <DreRow lbl="(+) FATURAMENTO DE PRODUTOS" val={recProd} bold color="#059669" bg="rgba(5,150,105,.07)"/>
+            {recPorProd.map(p=><SubRow key={p.id} nome={p.nome} val={p.rec} qtd={p.qtd}/>)}
+
+            {recTele>0 && <DreRow lbl="(+) RECEITA DE TELE ENTREGA" val={recTele} bold color="#059669" bg="rgba(5,150,105,.04)"/>}
+
+            <DreRow lbl="(=) RECEITA TOTAL" val={recTotal} bold color="#059669" bg="rgba(5,150,105,.1)" sep/>
+
+            {/* DEDUÇÕES */}
+            <DreRow lbl="(-) CMV — Custo das Mercadorias Vendidas" val={-cmv} indent={1} color="#ef4444"/>
+            {totEmb>0  && <DreRow lbl="(-) Custos de Embalagem"    val={-totEmb}  indent={1} color="#ef4444"/>}
+            {totDesc>0 && <DreRow lbl="(-) Descontos Concedidos"   val={-totDesc} indent={1} color="#ef4444"/>}
+
+            <DreRow lbl="(=) LUCRO BRUTO" val={lucBruto} bold bg="var(--card2)" sep color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
+
+            <DreRow lbl="(-) DESPESAS OPERACIONAIS" val={-totDesp} bold color="#d97706" sep/>
+            {despesas.map(d=><DreRow key={d.id} lbl={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} val={-d.valor} indent={1}/>)}
+
+            <DreRow lbl="(=) LUCRO OPERACIONAL" val={lucOp} bold bg={lucOp>=0?"rgba(5,150,105,.07)":"rgba(239,68,68,.07)"} sep color={lucOp>=0?"#059669":"#ef4444"}/>
+
             <tr style={{background:"var(--card2)"}}>
               <td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>📐 Margem Operacional</td>
               <td style={{...S.td,textAlign:"right",fontWeight:700,color:moPct>=0?"#7c3aed":"#ef4444",fontSize:16}}>{fP(moPct)}</td>
@@ -757,7 +741,6 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
   );
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────────────────
 function DashboardTab({fichasCalc,vendas,margens,getPreco,recBruta,lucOp,totDesp,despesas}){
   const porProd=fichasCalc.map(fc=>{const qtd=vendas.filter(v=>v.fichaId===fc.id).reduce((s,v)=>s+v.qtd,0),rec=qtd*getPreco(fc.id),cus=qtd*fc.custo;return{nome:fc.nome.length>14?fc.nome.slice(0,14)+"…":fc.nome,qtd,receita:rec,custo:cus,lucro:rec-cus,margem:+(margens[fc.id]??40)};}).filter(p=>p.qtd>0);
   const maisLuc=[...porProd].sort((a,b)=>b.lucro-a.lucro)[0];
@@ -792,20 +775,19 @@ export default function App(){
   const [dark,setDark]=useState(()=>lsGet("nagarrafa-theme","light")==="dark");
   const [currentUser,setCurrentUser]=useState(null);
   const [tab,setTab]=useState(0);
-  const [usuarios,setUsuarios]   =useState(()=>lsGet("ac4_usr",DEFAULT_ADMIN));
-  const [idef,setIdef]           =useState(()=>lsGet("ac4_idef",[]));
-  const [entradas,setEntradas]   =useState(()=>lsGet("ac4_ent",[]));
-  const [fichas,setFichas]       =useState(()=>lsGet("ac4_fic",[]));
-  const [margens,setMargens]     =useState(()=>lsGet("ac4_mar",{}));
-  const [precos,setPrecos]       =useState(()=>lsGet("ac4_pre",{}));
-  const [despesas,setDespesas]   =useState(()=>lsGet("ac4_des",[]));
-  const [producoes,setProducoes] =useState(()=>lsGet("ac4_prod",[]));
-  const [pedidos,setPedidos]     =useState(()=>lsGet("ac4_ped",[]));
-  const [vendas,setVendas]       =useState(()=>lsGet("ac4_ven",[]));
+  const [usuarios,setUsuarios]  =useState(()=>lsGet("ac4_usr",DEFAULT_ADMIN));
+  const [idef,setIdef]          =useState(()=>lsGet("ac4_idef",[]));
+  const [entradas,setEntradas]  =useState(()=>lsGet("ac4_ent",[]));
+  const [fichas,setFichas]      =useState(()=>lsGet("ac4_fic",[]));
+  const [margens,setMargens]    =useState(()=>lsGet("ac4_mar",{}));
+  const [precos,setPrecos]      =useState(()=>lsGet("ac4_pre",{}));
+  const [despesas,setDespesas]  =useState(()=>lsGet("ac4_des",[]));
+  const [producoes,setProducoes]=useState(()=>lsGet("ac4_prod",[]));
+  const [pedidos,setPedidos]    =useState(()=>lsGet("ac4_ped",[]));
+  const [vendas,setVendas]      =useState(()=>lsGet("ac4_ven",[]));
 
   useEffect(()=>{const s=document.createElement("style");s.id="ng-theme";s.textContent=CSS_VARS;document.head.appendChild(s);return()=>s.remove();},[]);
   useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");lsSet("nagarrafa-theme",dark?"dark":"light");},[dark]);
-
   useEffect(()=>{lsSet("ac4_usr",  usuarios);},[usuarios]);
   useEffect(()=>{lsSet("ac4_idef", idef);},[idef]);
   useEffect(()=>{lsSet("ac4_ent",  entradas);},[entradas]);
@@ -859,7 +841,6 @@ export default function App(){
           </div>
         </div>
       </div>
-
       <div style={{background:"var(--tab-bg)",borderBottom:"1px solid var(--tab-border)",overflowX:"auto"}}>
         <div style={{maxWidth:1300,margin:"0 auto",display:"flex"}}>
           {visibleTabs.map(t=>(
@@ -869,7 +850,6 @@ export default function App(){
           ))}
         </div>
       </div>
-
       <div style={{maxWidth:1300,margin:"0 auto",padding:"20px 20px 40px"}}>
         {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
         {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef}/>}
