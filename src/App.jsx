@@ -18,7 +18,7 @@ const ROLE_COLORS = {Admin:{bg:"#ede9fe",color:"#5b21b6"},Comprador:{bg:"#dbeafe
 const PERMS = {
   Admin:     {tabs:[0,1,2,3,4,5,6,7,8,9,10,11,12],editPrecos:true, canConfirmarPedido:true},
   Comprador: {tabs:[1,2,5,6,7,12],                 editPrecos:false,canConfirmarPedido:true},
-  Vendedor:  {tabs:[4,6],                          editPrecos:false,canConfirmarPedido:false},
+  Vendedor:  {tabs:[4,6],                           editPrecos:false,canConfirmarPedido:false},
 };
 const canTab = (role,idx) => PERMS[role]?.tabs.includes(idx)??false;
 
@@ -105,7 +105,7 @@ function UsuariosTab({usuarios,setUsuarios,currentUser}){
     <Card title="🔐 Matriz de Permissões">
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
         <thead><tr><th style={S.th}>Funcionalidade</th>{Object.keys(ROLES).map(r=><th key={r} style={{...S.th,textAlign:"center"}}><Pill label={r} color={ROLE_COLORS[r].color} bg={ROLE_COLORS[r].bg}/></th>)}</tr></thead>
-        <tbody>{[["🧂 Insumos / 📋 Fichas",true,false,false],["📥 Compras",true,true,false],["📦 Estoque",true,true,false],["🏭 Produção",true,true,false],["💰 Preços — Editar",true,false,false],["💰 Preços — Visualizar",true,false,true],["📝 Pedidos",true,true,true],["🛒 Vendas",true,true,false],["✅ Confirmar Pedidos",true,true,false],["🏢 Despesas",true,false,false],["📊 DRE / 🎯 Dashboard",true,false,false],["👥 Gerenciar Usuários",true,false,false]].map(([label,a,b,c])=>(
+        <tbody>{[["🧂 Insumos / 📋 Fichas",true,false,false],["📥 Compras",true,true,false],["📦 Estoque",true,true,false],["🏭 Produção",true,true,false],["💰 Preços — Editar",true,false,false],["💰 Preços — Visualizar",true,false,true],["📝 Pedidos",true,true,true],["🛒 Vendas",true,true,false],["✅ Confirmar Pedidos",true,true,false],["🏢 Despesas",true,false,false],["📊 DRE / 🎯 Dashboard",true,false,false],["🛍️ Lista de Compras",true,true,false],["👥 Gerenciar Usuários",true,false,false]].map(([label,a,b,c])=>(
           <tr key={label}><td style={{...S.td,fontWeight:500}}>{label}</td>{[a,b,c].map((v,i)=><td key={i} style={{...S.td,textAlign:"center"}}>{v?"✅":<span style={{color:"var(--border4)"}}>—</span>}</td>)}</tr>
         ))}</tbody>
       </table>
@@ -127,24 +127,63 @@ function UsuariosTab({usuarios,setUsuarios,currentUser}){
   </>);
 }
 
+// ── INSUMOS — agora com campo capacidadeUnitaria ──────────────────────────
 function InsumosDefTab({idef,setIdef}){
-  const blank={nome:"",unidade:"kg"};const [f,setF]=useState(blank);const [eid,setEid]=useState(null);
-  function salvar(){if(!f.nome.trim())return alert("Informe o nome.");const it={id:eid||uid(),nome:f.nome.trim(),unidade:f.unidade};setIdef(eid?idef.map(i=>i.id===eid?it:i):[...idef,it]);setF(blank);setEid(null);}
+  const blank={nome:"",unidade:"kg",capacidadeUnitaria:""};
+  const [f,setF]=useState(blank);const [eid,setEid]=useState(null);
+  function salvar(){
+    if(!f.nome.trim())return alert("Informe o nome.");
+    const it={
+      id:eid||uid(),
+      nome:f.nome.trim(),
+      unidade:f.unidade,
+      capacidadeUnitaria:f.capacidadeUnitaria&&+f.capacidadeUnitaria>0?+f.capacidadeUnitaria:null
+    };
+    setIdef(eid?idef.map(i=>i.id===eid?it:i):[...idef,it]);
+    setF(blank);setEid(null);
+  }
   return(<>
     <Card title="➕ Cadastrar Insumo">
-      <p style={{margin:"0 0 14px",fontSize:13,color:"var(--text3)"}}>Cadastre os ingredientes usados na produção. O custo será definido ao registrar compras.</p>
-      <G cols="3fr 1fr auto">
+      <p style={{margin:"0 0 14px",fontSize:13,color:"var(--text3)"}}>
+        Cadastre os ingredientes usados na produção. A <strong>capacidade unitária</strong> representa o tamanho da embalagem comercial (ex: 1 kg por pacote) — usada para sugerir quantidades de compra sem sobra.
+      </p>
+      <G cols="2.5fr 1fr 1fr auto">
         <div><Lbl s="Nome *"/><input style={S.inp} placeholder="Ex: Polpa de Açaí" value={f.nome} onChange={e=>setF({...f,nome:e.target.value})}/></div>
         <div><Lbl s="Unidade"/><select style={S.inp} value={f.unidade} onChange={e=>setF({...f,unidade:e.target.value})}>{UNITS.map(u=><option key={u}>{u}</option>)}</select></div>
-        <div style={{display:"flex",alignItems:"flex-end",gap:6}}>{eid&&<button style={S.btn2} onClick={()=>{setF(blank);setEid(null)}}>✕</button>}<button style={S.btn} onClick={salvar}>{eid?"✓ Atualizar":"+ Adicionar"}</button></div>
+        <div>
+          <Lbl s="Cap. unitária (embalagem)"/>
+          <div style={{position:"relative"}}>
+            <input style={{...S.inp,paddingRight:36}} type="number" step="0.001" min="0" placeholder={`Ex: 1 (${f.unidade})`} value={f.capacidadeUnitaria} onChange={e=>setF({...f,capacidadeUnitaria:e.target.value})}/>
+            <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:12,color:"var(--text4)",pointerEvents:"none"}}>{f.unidade}</span>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"flex-end",gap:6}}>
+          {eid&&<button style={S.btn2} onClick={()=>{setF(blank);setEid(null)}}>✕</button>}
+          <button style={S.btn} onClick={salvar}>{eid?"✓ Atualizar":"+ Adicionar"}</button>
+        </div>
       </G>
+      <p style={{margin:"8px 0 0",fontSize:12,color:"var(--text4)"}}>💡 Dica: se o açaí vem em pacotes de 1 kg, informe 1. Se vem em embalagens de 500 g, informe 0.5 (em kg) ou 500 (em g).</p>
     </Card>
     <Card title={`📋 Insumos (${idef.length})`}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Insumo","Unidade","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Insumo","Unidade","Cap. Unitária (embalagem)","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!idef.length&&<tr><td colSpan={3} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum insumo cadastrado. Adicione acima 👆</td></tr>}
-          {idef.map(i=><tr key={i.id}><td style={{...S.td,fontWeight:500}}>{i.nome}</td><td style={S.td}>{i.unidade}</td><td style={S.td}><button style={S.bsm} onClick={()=>{setF({nome:i.nome,unidade:i.unidade});setEid(i.id)}}>✏️</button><button style={{...S.bsm,color:"#ef4444",marginLeft:6}} onClick={()=>{if(window.confirm("Remover?"))setIdef(idef.filter(x=>x.id!==i.id))}}>🗑️</button></td></tr>)}
+          {!idef.length&&<tr><td colSpan={4} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum insumo cadastrado. Adicione acima 👆</td></tr>}
+          {idef.map(i=>(
+            <tr key={i.id}>
+              <td style={{...S.td,fontWeight:500}}>{i.nome}</td>
+              <td style={S.td}>{i.unidade}</td>
+              <td style={S.td}>
+                {i.capacidadeUnitaria
+                  ? <span style={{background:"var(--accent-soft)",color:"#7c3aed",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{i.capacidadeUnitaria} {i.unidade}/emb.</span>
+                  : <span style={{color:"var(--text4)",fontSize:12}}>— não definida</span>}
+              </td>
+              <td style={S.td}>
+                <button style={S.bsm} onClick={()=>{setF({nome:i.nome,unidade:i.unidade,capacidadeUnitaria:i.capacidadeUnitaria||""});setEid(i.id)}}>✏️</button>
+                <button style={{...S.bsm,color:"#ef4444",marginLeft:6}} onClick={()=>{if(window.confirm("Remover?"))setIdef(idef.filter(x=>x.id!==i.id))}}>🗑️</button>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </Card>
@@ -587,158 +626,71 @@ function DespesasTab({despesas,setDespesas}){
   </>);
 }
 
-// ── DRE ───────────────────────────────────────────────────────────────────
 function DRETab({vendas,fichasCalc,getPreco,despesas}){
   const now=new Date();
   const [mes,setMes]=useState(now.getMonth()+1);
   const [ano,setAno]=useState(now.getFullYear());
   const [filtroAtivo,setFiltroAtivo]=useState(false);
-
   const anosDisp=[...new Set(vendas.map(v=>v.data?.slice(0,4)).filter(Boolean))].sort();
-
-  // vendas filtradas pelo período
-  const vf = filtroAtivo
-    ? vendas.filter(v=>{ if(!v.data)return false; const[y,m]=v.data.split("-"); return +m===mes&&+y===ano; })
-    : vendas;
-
-  // receita por produto (sublinha gerencial)
-  const recPorProd = fichasCalc.map(fc=>{
-    const vProd=vf.filter(v=>v.fichaId===fc.id);
-    const rec=vProd.reduce((s,v)=>s+v.qtd*getPreco(fc.id),0);
-    const qtd=vProd.reduce((s,v)=>s+v.qtd,0);
-    return {id:fc.id, nome:fc.nome, rec, qtd};
-  }).filter(p=>p.qtd>0);
-
-  const recProd  = recPorProd.reduce((s,p)=>s+p.rec, 0);
-  const recTele  = vf.reduce((s,v)=>s+(v.teleValor||0), 0);
-  const recTotal = recProd + recTele;
-  const cmv      = vf.reduce((s,v)=>{const f=fichasCalc.find(p=>p.id===v.fichaId);return s+(f?v.qtd*f.custo:0);}, 0);
-  const totEmb   = vf.reduce((s,v)=>s+(v.embalagemCusto||0), 0);
-  const totDesc  = vf.reduce((s,v)=>s+(v.desconto||0), 0);
-  const lucBruto = recTotal - cmv - totEmb - totDesc;
-  const totDesp  = despesas.reduce((s,d)=>s+(+d.valor||0), 0);
-  const lucOp    = lucBruto - totDesp;
-  const mbPct    = recTotal>0 ? lucBruto/recTotal*100 : 0;
-  const moPct    = recTotal>0 ? lucOp/recTotal*100    : 0;
-  const label    = filtroAtivo ? `${MESES[mes-1]}/${ano}` : "Todo o período";
-
-  function pct(v){ return recTotal>0 ? fP(v/recTotal*100) : "—"; }
-
+  const vf=filtroAtivo?vendas.filter(v=>{if(!v.data)return false;const[y,m]=v.data.split("-");return +m===mes&&+y===ano;}):vendas;
+  const recPorProd=fichasCalc.map(fc=>{const vProd=vf.filter(v=>v.fichaId===fc.id);const rec=vProd.reduce((s,v)=>s+v.qtd*getPreco(fc.id),0);const qtd=vProd.reduce((s,v)=>s+v.qtd,0);return{id:fc.id,nome:fc.nome,rec,qtd};}).filter(p=>p.qtd>0);
+  const recProd=recPorProd.reduce((s,p)=>s+p.rec,0);
+  const recTele=vf.reduce((s,v)=>s+(v.teleValor||0),0);
+  const recTotal=recProd+recTele;
+  const cmv=vf.reduce((s,v)=>{const f=fichasCalc.find(p=>p.id===v.fichaId);return s+(f?v.qtd*f.custo:0);},0);
+  const totEmb=vf.reduce((s,v)=>s+(v.embalagemCusto||0),0);
+  const totDesc=vf.reduce((s,v)=>s+(v.desconto||0),0);
+  const lucBruto=recTotal-cmv-totEmb-totDesc;
+  const totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0);
+  const lucOp=lucBruto-totDesp;
+  const mbPct=recTotal>0?lucBruto/recTotal*100:0;
+  const moPct=recTotal>0?lucOp/recTotal*100:0;
+  const label=filtroAtivo?`${MESES[mes-1]}/${ano}`:"Todo o período";
+  function pct(v){return recTotal>0?fP(v/recTotal*100):"—";}
   function exportCSV(){
-    const rows=[
-      ["Período",label,""],
-      ["Descrição","Valor (R$)","% Receita Total"],
-      ["FATURAMENTO DE PRODUTOS",recProd.toFixed(2),pct(recProd)],
-      ...recPorProd.map(p=>[`  ↳ ${p.nome} (${p.qtd} un)`,p.rec.toFixed(2),pct(p.rec)]),
-      recTele>0?["RECEITA TELE ENTREGA",recTele.toFixed(2),pct(recTele)]:[],
-      ["RECEITA TOTAL",recTotal.toFixed(2),"100.0%"],
-      ["(-) CMV",(-cmv).toFixed(2),pct(-cmv)],
-      totEmb>0?["(-) Embalagens",(-totEmb).toFixed(2),pct(-totEmb)]:[],
-      totDesc>0?["(-) Descontos",(-totDesc).toFixed(2),pct(-totDesc)]:[],
-      ["(=) LUCRO BRUTO",lucBruto.toFixed(2),fP(mbPct)],
-      ...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),pct(-d.valor)]),
-      ["(=) LUCRO OPERACIONAL",lucOp.toFixed(2),fP(moPct)],
-    ].filter(r=>r.length>0);
-    const a=document.createElement("a");
-    a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n"));
-    a.download=`DRE_NaGarrafa_${label.replace("/","_")}.csv`;
-    a.click();
+    const rows=[["Período",label,""],["Descrição","Valor (R$)","% Receita Total"],["FATURAMENTO DE PRODUTOS",recProd.toFixed(2),pct(recProd)],...recPorProd.map(p=>[`  ↳ ${p.nome} (${p.qtd} un)`,p.rec.toFixed(2),pct(p.rec)]),recTele>0?["RECEITA TELE ENTREGA",recTele.toFixed(2),pct(recTele)]:[],...[["RECEITA TOTAL",recTotal.toFixed(2),"100.0%"],["(-) CMV",(-cmv).toFixed(2),pct(-cmv)]],...(totEmb>0?[["(-) Embalagens",(-totEmb).toFixed(2),pct(-totEmb)]]:[]),...(totDesc>0?[["(-) Descontos",(-totDesc).toFixed(2),pct(-totDesc)]]:[]),["(=) LUCRO BRUTO",lucBruto.toFixed(2),fP(mbPct)],...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),pct(-d.valor)]),["(=) LUCRO OPERACIONAL",lucOp.toFixed(2),fP(moPct)]].filter(r=>r.length>0);
+    const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n"));a.download=`DRE_NaGarrafa_${label.replace("/","_")}.csv`;a.click();
   }
-
-  // Componente linha do DRE
-  function DreRow({lbl,val,indent,bold,color,bg,sep}){
-    indent=indent||0; bold=bold||false; bg=bg||"transparent"; sep=sep||false;
-    return(
-      <tr style={{background:bg,borderTop:sep?"2px solid var(--border3)":"none"}}>
-        <td style={{...S.td,paddingLeft:16+indent*18,fontWeight:bold?700:400,color:color||"var(--text)",fontSize:bold?15:14}}>{lbl}</td>
-        <td style={{...S.td,textAlign:"right",fontWeight:bold?700:500,color:color||"var(--text)",fontSize:bold?15:14}}>{fR(val)}</td>
-        <td style={{...S.td,textAlign:"right",fontSize:13,color:"var(--text4)"}}>{pct(val)}</td>
-      </tr>
-    );
-  }
-
-  // linha sublinha de produto (destaque menor)
-  function SubRow({nome,val,qtd}){
-    return(
-      <tr style={{background:"rgba(5,150,105,.02)"}}>
-        <td style={{...S.td,paddingLeft:34,fontSize:13,color:"var(--text3)"}}>↳ {nome} <span style={{color:"var(--text4)",fontSize:11}}>({qtd} un)</span></td>
-        <td style={{...S.td,textAlign:"right",fontSize:13,color:"#059669"}}>{fR(val)}</td>
-        <td style={{...S.td,textAlign:"right",fontSize:12,color:"var(--text4)"}}>{pct(val)}</td>
-      </tr>
-    );
-  }
-
-  return(
-    <>
-      {/* Filtro */}
-      <Card title="🗓️ Filtro de Período">
-        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <input type="checkbox" id="filtroAtivo" checked={filtroAtivo} onChange={e=>setFiltroAtivo(e.target.checked)} style={{width:16,height:16,accentColor:"#7c3aed",cursor:"pointer"}}/>
-            <label htmlFor="filtroAtivo" style={{fontSize:14,fontWeight:600,color:"#7c3aed",cursor:"pointer"}}>Filtrar por período</label>
-          </div>
-          <div style={{display:"flex",gap:8,opacity:filtroAtivo?1:.4,pointerEvents:filtroAtivo?"auto":"none"}}>
-            <div><Lbl s="Mês"/><select style={{...S.inp,width:150}} value={mes} onChange={e=>setMes(+e.target.value)}>{MESES.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}</select></div>
-            <div><Lbl s="Ano"/><select style={{...S.inp,width:100}} value={ano} onChange={e=>setAno(+e.target.value)}>{[...new Set([...anosDisp,String(now.getFullYear())])].sort().map(a=><option key={a} value={a}>{a}</option>)}</select></div>
-          </div>
-          <div style={{marginLeft:8,marginTop:16}}>
-            <span style={{fontSize:13,background:filtroAtivo?"var(--accent-soft)":"var(--card2)",color:filtroAtivo?"#7c3aed":"var(--text3)",padding:"6px 14px",borderRadius:20,fontWeight:600}}>
-              {filtroAtivo?`📅 ${label}`:"📅 Todo o período"}
-            </span>
-          </div>
-          {filtroAtivo&&<div style={{marginTop:16}}><span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.1)",padding:"6px 14px",borderRadius:20}}>🧾 {vf.length} venda(s)</span></div>}
+  function DreRow({lbl,val,indent,bold,color,bg,sep}){indent=indent||0;bold=bold||false;bg=bg||"transparent";sep=sep||false;return(<tr style={{background:bg,borderTop:sep?"2px solid var(--border3)":"none"}}><td style={{...S.td,paddingLeft:16+indent*18,fontWeight:bold?700:400,color:color||"var(--text)",fontSize:bold?15:14}}>{lbl}</td><td style={{...S.td,textAlign:"right",fontWeight:bold?700:500,color:color||"var(--text)",fontSize:bold?15:14}}>{fR(val)}</td><td style={{...S.td,textAlign:"right",fontSize:13,color:"var(--text4)"}}>{pct(val)}</td></tr>);}
+  function SubRow({nome,val,qtd}){return(<tr style={{background:"rgba(5,150,105,.02)"}}><td style={{...S.td,paddingLeft:34,fontSize:13,color:"var(--text3)"}}>↳ {nome} <span style={{color:"var(--text4)",fontSize:11}}>({qtd} un)</span></td><td style={{...S.td,textAlign:"right",fontSize:13,color:"#059669"}}>{fR(val)}</td><td style={{...S.td,textAlign:"right",fontSize:12,color:"var(--text4)"}}>{pct(val)}</td></tr>);}
+  return(<>
+    <Card title="🗓️ Filtro de Período">
+      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" id="filtroAtivo" checked={filtroAtivo} onChange={e=>setFiltroAtivo(e.target.checked)} style={{width:16,height:16,accentColor:"#7c3aed",cursor:"pointer"}}/><label htmlFor="filtroAtivo" style={{fontSize:14,fontWeight:600,color:"#7c3aed",cursor:"pointer"}}>Filtrar por período</label></div>
+        <div style={{display:"flex",gap:8,opacity:filtroAtivo?1:.4,pointerEvents:filtroAtivo?"auto":"none"}}>
+          <div><Lbl s="Mês"/><select style={{...S.inp,width:150}} value={mes} onChange={e=>setMes(+e.target.value)}>{MESES.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}</select></div>
+          <div><Lbl s="Ano"/><select style={{...S.inp,width:100}} value={ano} onChange={e=>setAno(+e.target.value)}>{[...new Set([...anosDisp,String(now.getFullYear())])].sort().map(a=><option key={a} value={a}>{a}</option>)}</select></div>
         </div>
-      </Card>
-
-      {/* KPIs */}
-      <G cols="repeat(4,1fr)" gap={12} mb={20}>
-        <KPI label="💵 Faturamento Produtos" value={fR(recProd)}  color="#059669"/>
-        <KPI label="🛵 Receita Tele"         value={fR(recTele)}  color="#059669"/>
-        <KPI label="📈 Lucro Bruto"          value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
-        <KPI label="🏆 Lucro Operacional"    value={fR(lucOp)}    color={lucOp>=0?"#1d4ed8":"#ef4444"}/>
-      </G>
-
-      {/* Tabela DRE */}
-      <Card title={`📊 DRE Gerencial — ${label}`} right={<button style={S.btn2} onClick={exportCSV}>📥 Exportar CSV</button>}>
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead>
-            <tr style={{background:"#4c1d95"}}>
-              {["Descrição","Valor (R$)","% Receita"].map(h=>(
-                <th key={h} style={{...S.th,background:"#4c1d95",color:"white",textAlign:h!=="Descrição"?"right":"left"}}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {/* FATURAMENTO */}
-            <DreRow lbl="(+) FATURAMENTO DE PRODUTOS" val={recProd} bold color="#059669" bg="rgba(5,150,105,.07)"/>
-            {recPorProd.map(p=><SubRow key={p.id} nome={p.nome} val={p.rec} qtd={p.qtd}/>)}
-
-            {recTele>0 && <DreRow lbl="(+) RECEITA DE TELE ENTREGA" val={recTele} bold color="#059669" bg="rgba(5,150,105,.04)"/>}
-
-            <DreRow lbl="(=) RECEITA TOTAL" val={recTotal} bold color="#059669" bg="rgba(5,150,105,.1)" sep/>
-
-            {/* DEDUÇÕES */}
-            <DreRow lbl="(-) CMV — Custo das Mercadorias Vendidas" val={-cmv} indent={1} color="#ef4444"/>
-            {totEmb>0  && <DreRow lbl="(-) Custos de Embalagem"    val={-totEmb}  indent={1} color="#ef4444"/>}
-            {totDesc>0 && <DreRow lbl="(-) Descontos Concedidos"   val={-totDesc} indent={1} color="#ef4444"/>}
-
-            <DreRow lbl="(=) LUCRO BRUTO" val={lucBruto} bold bg="var(--card2)" sep color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
-
-            <DreRow lbl="(-) DESPESAS OPERACIONAIS" val={-totDesp} bold color="#d97706" sep/>
-            {despesas.map(d=><DreRow key={d.id} lbl={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} val={-d.valor} indent={1}/>)}
-
-            <DreRow lbl="(=) LUCRO OPERACIONAL" val={lucOp} bold bg={lucOp>=0?"rgba(5,150,105,.07)":"rgba(239,68,68,.07)"} sep color={lucOp>=0?"#059669":"#ef4444"}/>
-
-            <tr style={{background:"var(--card2)"}}>
-              <td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>📐 Margem Operacional</td>
-              <td style={{...S.td,textAlign:"right",fontWeight:700,color:moPct>=0?"#7c3aed":"#ef4444",fontSize:16}}>{fP(moPct)}</td>
-              <td style={{...S.td,textAlign:"right",fontSize:13,color:"var(--text4)"}}>{fP(moPct)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </Card>
-    </>
-  );
+        <div style={{marginLeft:8,marginTop:16}}><span style={{fontSize:13,background:filtroAtivo?"var(--accent-soft)":"var(--card2)",color:filtroAtivo?"#7c3aed":"var(--text3)",padding:"6px 14px",borderRadius:20,fontWeight:600}}>{filtroAtivo?`📅 ${label}`:"📅 Todo o período"}</span></div>
+        {filtroAtivo&&<div style={{marginTop:16}}><span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.1)",padding:"6px 14px",borderRadius:20}}>🧾 {vf.length} venda(s)</span></div>}
+      </div>
+    </Card>
+    <G cols="repeat(4,1fr)" gap={12} mb={20}>
+      <KPI label="💵 Faturamento Produtos" value={fR(recProd)} color="#059669"/>
+      <KPI label="🛵 Receita Tele" value={fR(recTele)} color="#059669"/>
+      <KPI label="📈 Lucro Bruto" value={fR(lucBruto)} color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
+      <KPI label="🏆 Lucro Operacional" value={fR(lucOp)} color={lucOp>=0?"#1d4ed8":"#ef4444"}/>
+    </G>
+    <Card title={`📊 DRE Gerencial — ${label}`} right={<button style={S.btn2} onClick={exportCSV}>📥 Exportar CSV</button>}>
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead><tr style={{background:"#4c1d95"}}>{["Descrição","Valor (R$)","% Receita"].map(h=><th key={h} style={{...S.th,background:"#4c1d95",color:"white",textAlign:h!=="Descrição"?"right":"left"}}>{h}</th>)}</tr></thead>
+        <tbody>
+          <DreRow lbl="(+) FATURAMENTO DE PRODUTOS" val={recProd} bold color="#059669" bg="rgba(5,150,105,.07)"/>
+          {recPorProd.map(p=><SubRow key={p.id} nome={p.nome} val={p.rec} qtd={p.qtd}/>)}
+          {recTele>0&&<DreRow lbl="(+) RECEITA DE TELE ENTREGA" val={recTele} bold color="#059669" bg="rgba(5,150,105,.04)"/>}
+          <DreRow lbl="(=) RECEITA TOTAL" val={recTotal} bold color="#059669" bg="rgba(5,150,105,.1)" sep/>
+          <DreRow lbl="(-) CMV — Custo das Mercadorias Vendidas" val={-cmv} indent={1} color="#ef4444"/>
+          {totEmb>0&&<DreRow lbl="(-) Custos de Embalagem" val={-totEmb} indent={1} color="#ef4444"/>}
+          {totDesc>0&&<DreRow lbl="(-) Descontos Concedidos" val={-totDesc} indent={1} color="#ef4444"/>}
+          <DreRow lbl="(=) LUCRO BRUTO" val={lucBruto} bold bg="var(--card2)" sep color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
+          <DreRow lbl="(-) DESPESAS OPERACIONAIS" val={-totDesp} bold color="#d97706" sep/>
+          {despesas.map(d=><DreRow key={d.id} lbl={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} val={-d.valor} indent={1}/>)}
+          <DreRow lbl="(=) LUCRO OPERACIONAL" val={lucOp} bold bg={lucOp>=0?"rgba(5,150,105,.07)":"rgba(239,68,68,.07)"} sep color={lucOp>=0?"#059669":"#ef4444"}/>
+          <tr style={{background:"var(--card2)"}}><td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>📐 Margem Operacional</td><td style={{...S.td,textAlign:"right",fontWeight:700,color:moPct>=0?"#7c3aed":"#ef4444",fontSize:16}}>{fP(moPct)}</td><td style={{...S.td,textAlign:"right",fontSize:13,color:"var(--text4)"}}>{fP(moPct)}</td></tr>
+        </tbody>
+      </table>
+    </Card>
+  </>);
 }
 
 function DashboardTab({fichasCalc,vendas,margens,getPreco,recBruta,lucOp,totDesp,despesas}){
@@ -766,6 +718,402 @@ function DashboardTab({fichasCalc,vendas,margens,getPreco,recBruta,lucOp,totDesp
       </G>
     }
   </>);
+}
+
+// ── LISTA DE COMPRAS ────────────────────────────────────────────────────────
+function ListaComprasTab({fichasCalc, idef, setIdef, estoqueInsumoFn, custMedioFn}) {
+  const [plano, setPlano] = useState([]);
+  const [selFicha, setSelFicha] = useState("");
+  const [selQtd, setSelQtd] = useState("");
+  const [editCap, setEditCap] = useState({});
+
+  function addAoPlano() {
+    if (!selFicha) return alert("Selecione um produto.");
+    if (!selQtd || +selQtd <= 0) return alert("Informe a quantidade a produzir.");
+    const ex = plano.find(p => p.fichaId === selFicha);
+    if (ex) {
+      setPlano(plano.map(p => p.fichaId === selFicha ? {...p, qtd: p.qtd + (+selQtd)} : p));
+    } else {
+      setPlano([...plano, {id: uid(), fichaId: selFicha, qtd: +selQtd}]);
+    }
+    setSelQtd("");
+    setSelFicha("");
+  }
+
+  function removerDoPlano(id) {
+    setPlano(plano.filter(p => p.id !== id));
+  }
+
+  function atualizarQtd(id, val) {
+    if (+val <= 0) return;
+    setPlano(plano.map(p => p.id === id ? {...p, qtd: +val} : p));
+  }
+
+  // Calcular necessidades por insumo
+  const necessidades = {};
+  plano.forEach(({fichaId, qtd}) => {
+    const ficha = fichasCalc.find(f => f.id === fichaId);
+    if (!ficha) return;
+    (ficha.ings || []).forEach(ing => {
+      const ins = idef.find(i => i.id === ing.iid);
+      if (!ins) return;
+      const qtdNec = cvt(ing.qtd, ing.un || ins.unidade, ins.unidade) * qtd;
+      necessidades[ing.iid] = (necessidades[ing.iid] || 0) + qtdNec;
+    });
+  });
+
+  const lista = Object.entries(necessidades).map(([iid, qtdNec]) => {
+    const ins = idef.find(i => i.id === iid);
+    if (!ins) return null;
+    const estoque = Math.max(0, estoqueInsumoFn(iid));
+    const faltante = Math.max(0, qtdNec - estoque);
+    const cap = ins.capacidadeUnitaria;
+    let embalagens = null;
+    let qtdSugerida = faltante;
+    let sobra = 0;
+    if (cap && +cap > 0 && faltante > 0) {
+      embalagens = Math.ceil(faltante / +cap);
+      qtdSugerida = embalagens * +cap;
+      sobra = qtdSugerida - faltante;
+    }
+    const cm = custMedioFn(iid);
+    const custoEstimado = cm > 0 ? qtdSugerida * cm : 0;
+    return {iid, nome: ins.nome, unidade: ins.unidade, qtdNec, estoque, faltante, cap, embalagens, qtdSugerida, sobra, cm, custoEstimado, ok: faltante <= 0.0001};
+  }).filter(Boolean).sort((a, b) => (a.ok ? 1 : -1) - (b.ok ? 1 : -1));
+
+  const listaComprar = lista.filter(i => !i.ok);
+  const listaOk = lista.filter(i => i.ok);
+  const totalCusto = listaComprar.reduce((s, i) => s + i.custoEstimado, 0);
+  const semCapacidade = listaComprar.filter(i => !i.cap).length;
+
+  function salvarCap(iid) {
+    const val = editCap[iid];
+    if (!val || +val <= 0) return alert("Informe uma capacidade válida.");
+    setIdef(idef.map(i => i.id === iid ? {...i, capacidadeUnitaria: +val} : i));
+    setEditCap(ec => { const n = {...ec}; delete n[iid]; return n; });
+  }
+
+  function exportTxt() {
+    const linhas = ["========================================"];
+    linhas.push("    🛍️  LISTA DE COMPRAS — NaGarrafa");
+    linhas.push("========================================\n");
+    linhas.push("📋 PLANEJAMENTO DE PRODUÇÃO:");
+    plano.forEach(p => {
+      const f = fichasCalc.find(fc => fc.id === p.fichaId);
+      linhas.push(`   • ${f?.nome || "?"}: ${p.qtd} unidade(s)`);
+    });
+    linhas.push("\n🛒 O QUE COMPRAR:");
+    if (listaComprar.length === 0) {
+      linhas.push("   ✅ Estoque suficiente! Nada a comprar.");
+    } else {
+      listaComprar.forEach(i => {
+        const emb = i.embalagens ? ` → ${i.embalagens} embalagem(ns) de ${i.cap} ${i.unidade}` : "";
+        const custo = i.cm > 0 ? ` — est. ${fR(i.custoEstimado)}` : "";
+        linhas.push(`   • ${i.nome}: ${i.qtdSugerida.toFixed(3)} ${i.unidade}${emb}${custo}`);
+        if (i.sobra > 0) linhas.push(`     (sobra ${i.sobra.toFixed(3)} ${i.unidade} no estoque)`);
+      });
+    }
+    if (totalCusto > 0) linhas.push(`\n💰 CUSTO TOTAL ESTIMADO: ${fR(totalCusto)}`);
+    linhas.push("\n========================================");
+    const blob = new Blob([linhas.join("\n")], {type: "text/plain;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "lista_compras_nagarrafa.txt";
+    a.click();
+  }
+
+  const custoTotalLote = plano.reduce((s, p) => {
+    const fc = fichasCalc.find(f => f.id === p.fichaId);
+    return s + (fc ? fc.custo * p.qtd : 0);
+  }, 0);
+
+  return (
+    <>
+      {/* Planejamento */}
+      <Card title="🗂️ Plano de Produção">
+        <p style={{margin:"0 0 14px", fontSize:13, color:"var(--text3)"}}>
+          Informe quantas unidades deseja produzir. O sistema calcula automaticamente o que precisa ser comprado, descontando o estoque atual e sugerindo quantidades ideais de acordo com a embalagem dos insumos.
+        </p>
+        {!fichasCalc.length && (
+          <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:14,color:"#92400e",fontSize:13}}>
+            ⚠️ Cadastre fichas técnicas para usar a lista de compras.
+          </div>
+        )}
+        {fichasCalc.length > 0 && (
+          <>
+            <G cols="3fr 1fr auto" mb={plano.length > 0 ? 14 : 0}>
+              <div>
+                <Lbl s="Produto"/>
+                <select style={S.inp} value={selFicha} onChange={e => setSelFicha(e.target.value)}>
+                  <option value="">Selecione um produto...</option>
+                  {fichasCalc.map(f => <option key={f.id} value={f.id}>{f.nome} — custo {fR(f.custo)}/un</option>)}
+                </select>
+              </div>
+              <div>
+                <Lbl s="Qtd. a produzir"/>
+                <input style={S.inp} type="number" min="1" step="1" placeholder="Ex: 50" value={selQtd}
+                  onChange={e => setSelQtd(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addAoPlano()}/>
+              </div>
+              <div style={{display:"flex", alignItems:"flex-end"}}>
+                <button style={S.btn} onClick={addAoPlano}>+ Adicionar</button>
+              </div>
+            </G>
+
+            {plano.length > 0 && (
+              <div style={{background:"var(--card2)", border:"1px solid var(--border3)", borderRadius:10, overflow:"hidden"}}>
+                <table style={{width:"100%", borderCollapse:"collapse", fontSize:14}}>
+                  <thead>
+                    <tr>
+                      {["Produto", "Custo/un", "Qtd. a produzir", "Custo do lote", ""].map(h =>
+                        <th key={h} style={S.th}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {plano.map(p => {
+                      const fc = fichasCalc.find(f => f.id === p.fichaId);
+                      return (
+                        <tr key={p.id}>
+                          <td style={{...S.td, fontWeight:600, color:"#7c3aed"}}>{fc?.nome || "—"}</td>
+                          <td style={S.td}>{fR(fc?.custo || 0)}/un</td>
+                          <td style={S.td}>
+                            <div style={{display:"flex", alignItems:"center", gap:8}}>
+                              <input type="number" min="1" step="1" value={p.qtd}
+                                onChange={e => atualizarQtd(p.id, e.target.value)}
+                                style={{...S.inp, width:80, padding:"4px 8px", textAlign:"center"}}/>
+                              <span style={{color:"var(--text3)", fontSize:13}}>un</span>
+                            </div>
+                          </td>
+                          <td style={{...S.td, fontWeight:700, color:"#059669"}}>{fR((fc?.custo || 0) * p.qtd)}</td>
+                          <td style={S.td}>
+                            <button style={{...S.bsm, color:"#ef4444"}} onClick={() => removerDoPlano(p.id)}>🗑️</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr style={{background:"rgba(124,58,237,.06)"}}>
+                      <td colSpan={3} style={{...S.td, fontWeight:700, textAlign:"right", color:"#7c3aed"}}>
+                        Custo total dos lotes:
+                      </td>
+                      <td style={{...S.td, fontWeight:700, color:"#7c3aed", fontSize:15}}>{fR(custoTotalLote)}</td>
+                      <td style={S.td}/>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Resultado */}
+      {plano.length > 0 && lista.length > 0 && (
+        <>
+          {/* KPIs */}
+          <G cols="repeat(4,1fr)" gap={12} mb={20}>
+            <KPI label="🛒 Insumos a comprar" value={listaComprar.length} color={listaComprar.length > 0 ? "#7c3aed" : "#059669"}/>
+            <KPI label="✅ Já em estoque" value={listaOk.length} color="#059669"/>
+            <KPI label="💰 Custo estimado" value={totalCusto > 0 ? fR(totalCusto) : "—"} color="#1d4ed8" sub={totalCusto === 0 ? "Sem CM cadastrado" : ""}/>
+            <KPI label="📦 Custo total lotes" value={fR(custoTotalLote)} color="#6d28d9"/>
+          </G>
+
+          {/* Aviso sobre capacidade não definida */}
+          {semCapacidade > 0 && (
+            <div style={{background:"rgba(245,158,11,.08)", border:"1px solid #fde68a", borderRadius:10, padding:"12px 16px", marginBottom:16, display:"flex", gap:10, alignItems:"center"}}>
+              <span style={{fontSize:22}}>📦</span>
+              <div style={{fontSize:13, color:"#d97706"}}>
+                <strong>{semCapacidade} insumo(s)</strong> sem capacidade unitária definida. Defina o tamanho da embalagem na tabela abaixo para receber sugestões de quantidades exatas. Você também pode editar em <strong>🧂 Insumos</strong>.
+              </div>
+            </div>
+          )}
+
+          {/* Lista principal */}
+          <Card
+            title={listaComprar.length === 0 ? "✅ Nada a comprar!" : `🛒 Lista de Compras (${listaComprar.length} insumo${listaComprar.length !== 1 ? "s" : ""})`}
+            right={
+              <div style={{display:"flex", gap:8}}>
+                {plano.length > 0 && <button style={{...S.btn2, fontSize:12, padding:"6px 14px"}} onClick={() => setPlano([])}>🗑️ Limpar plano</button>}
+                <button style={{...S.btn, fontSize:12, padding:"6px 14px"}} onClick={exportTxt}>📥 Exportar .txt</button>
+              </div>
+            }
+          >
+            {listaComprar.length === 0 ? (
+              <div style={{textAlign:"center", padding:"28px", background:"rgba(5,150,105,.07)", borderRadius:10, color:"#059669"}}>
+                <div style={{fontSize:36, marginBottom:8}}>🎉</div>
+                <p style={{margin:0, fontWeight:600, fontSize:15}}>Estoque suficiente para toda a produção planejada!</p>
+                <p style={{margin:"6px 0 0", fontSize:13, color:"var(--text3)"}}>Nenhuma compra necessária.</p>
+              </div>
+            ) : (
+              <table style={{width:"100%", borderCollapse:"collapse", fontSize:14}}>
+                <thead>
+                  <tr>
+                    {["Insumo", "Necessário", "Em Estoque", "Faltante", "Embalagem", "Qtd. Sugerida", "Custo Est."].map(h =>
+                      <th key={h} style={S.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {listaComprar.map(item => (
+                    <tr key={item.iid} style={{borderLeft: item.cap ? "3px solid #7c3aed" : "3px solid #fde68a"}}>
+                      <td style={{...S.td, fontWeight:700}}>{item.nome}</td>
+
+                      <td style={S.td}>
+                        <span style={{fontWeight:600}}>{item.qtdNec.toFixed(3)}</span>
+                        <span style={{color:"var(--text4)", marginLeft:4, fontSize:12}}>{item.unidade}</span>
+                      </td>
+
+                      <td style={S.td}>
+                        <span style={{color: item.estoque > 0 ? "#d97706" : "var(--text4)", fontWeight: item.estoque > 0 ? 600 : 400}}>
+                          {item.estoque.toFixed(3)}
+                        </span>
+                        <span style={{color:"var(--text4)", marginLeft:4, fontSize:12}}>{item.unidade}</span>
+                      </td>
+
+                      <td style={S.td}>
+                        <span style={{color:"#ef4444", fontWeight:700}}>{item.faltante.toFixed(3)}</span>
+                        <span style={{color:"var(--text4)", marginLeft:4, fontSize:12}}>{item.unidade}</span>
+                      </td>
+
+                      {/* Embalagem */}
+                      <td style={S.td}>
+                        {item.cap ? (
+                          <div style={{display:"flex", alignItems:"center", gap:6}}>
+                            <span style={{background:"var(--accent-soft)", color:"#7c3aed", padding:"3px 10px", borderRadius:20, fontSize:12, fontWeight:600, whiteSpace:"nowrap"}}>
+                              {item.cap} {item.unidade}
+                            </span>
+                            <button style={{...S.bsm, fontSize:10, padding:"2px 6px"}}
+                              onClick={() => setEditCap({...editCap, [item.iid]: item.cap})}>✏️</button>
+                          </div>
+                        ) : editCap[item.iid] !== undefined ? (
+                          <div style={{display:"flex", gap:4, alignItems:"center", flexWrap:"wrap"}}>
+                            <input type="number" step="0.001" min="0.001"
+                              placeholder={`Em ${item.unidade}`}
+                              value={editCap[item.iid]}
+                              onChange={e => setEditCap({...editCap, [item.iid]: e.target.value})}
+                              style={{...S.inp, width:70, padding:"3px 6px", fontSize:12}}/>
+                            <span style={{fontSize:12, color:"var(--text3)"}}>{item.unidade}</span>
+                            <button style={{...S.bsm, fontSize:11, background:"#dcfce7", color:"#065f46", border:"1px solid #86efac"}}
+                              onClick={() => salvarCap(item.iid)}>✓</button>
+                            <button style={{...S.bsm, fontSize:11}}
+                              onClick={() => setEditCap(ec => {const n={...ec}; delete n[item.iid]; return n;})}>✕</button>
+                          </div>
+                        ) : (
+                          <button style={{...S.bsm, fontSize:11, color:"#d97706", borderColor:"#fde68a", background:"rgba(253,230,138,.2)", whiteSpace:"nowrap"}}
+                            onClick={() => setEditCap({...editCap, [item.iid]: ""})}>
+                            + Definir embalagem
+                          </button>
+                        )}
+                        {editCap[item.iid] !== undefined && item.cap && (
+                          <div style={{display:"flex", gap:4, alignItems:"center", flexWrap:"wrap", marginTop:4}}>
+                            <input type="number" step="0.001" min="0.001"
+                              value={editCap[item.iid]}
+                              onChange={e => setEditCap({...editCap, [item.iid]: e.target.value})}
+                              style={{...S.inp, width:70, padding:"3px 6px", fontSize:12}}/>
+                            <span style={{fontSize:12, color:"var(--text3)"}}>{item.unidade}</span>
+                            <button style={{...S.bsm, fontSize:11, background:"#dcfce7", color:"#065f46", border:"1px solid #86efac"}}
+                              onClick={() => salvarCap(item.iid)}>✓ Salvar</button>
+                            <button style={{...S.bsm, fontSize:11}}
+                              onClick={() => setEditCap(ec => {const n={...ec}; delete n[item.iid]; return n;})}>✕</button>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Qtd sugerida */}
+                      <td style={S.td}>
+                        {item.embalagens ? (
+                          <div>
+                            <div style={{fontWeight:700, color:"#7c3aed", fontSize:15}}>
+                              {item.qtdSugerida.toFixed(3)} <span style={{fontSize:12, fontWeight:400}}>{item.unidade}</span>
+                            </div>
+                            <div style={{marginTop:3}}>
+                              <span style={{background:"rgba(124,58,237,.1)", color:"#7c3aed", padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:600}}>
+                                {item.embalagens} emb. × {item.cap} {item.unidade}
+                              </span>
+                            </div>
+                            {item.sobra > 0.001 && (
+                              <div style={{fontSize:11, color:"#059669", marginTop:3}}>
+                                ↳ sobra {item.sobra.toFixed(3)} {item.unidade} no estoque
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            <span style={{fontWeight:700, color:"#ef4444"}}>{item.faltante.toFixed(3)}</span>
+                            <span style={{fontSize:12, color:"var(--text4)", marginLeft:4}}>{item.unidade}</span>
+                            <div style={{fontSize:11, color:"#d97706", marginTop:2}}>↳ defina embalagem para sugestão</div>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Custo estimado */}
+                      <td style={S.td}>
+                        {item.cm > 0 ? (
+                          <div>
+                            <div style={{fontWeight:700, color:"#1d4ed8", fontSize:14}}>{fR(item.custoEstimado)}</div>
+                            <div style={{fontSize:11, color:"var(--text4)", marginTop:2}}>CM: {fR(item.cm)}/{item.unidade}</div>
+                          </div>
+                        ) : (
+                          <span style={{fontSize:12, color:"var(--text4)"}}>Sem CM</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* Total */}
+                  <tr style={{background:"rgba(29,78,216,.06)", borderTop:"2px solid var(--border3)"}}>
+                    <td colSpan={6} style={{...S.td, fontWeight:700, textAlign:"right", color:"#1d4ed8"}}>
+                      💰 Custo total estimado de compra:
+                    </td>
+                    <td style={{...S.td, fontWeight:700, color:"#1d4ed8", fontSize:16}}>
+                      {totalCusto > 0 ? fR(totalCusto) : <span style={{color:"var(--text4)", fontSize:13}}>— sem CM</span>}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </Card>
+
+          {/* Em estoque */}
+          {listaOk.length > 0 && (
+            <Card title={`✅ Já em estoque — não precisa comprar (${listaOk.length})`}>
+              <div style={{display:"flex", gap:10, flexWrap:"wrap"}}>
+                {listaOk.map(item => (
+                  <div key={item.iid} style={{background:"rgba(5,150,105,.07)", border:"1px solid #6ee7b7", borderRadius:10, padding:"10px 16px", minWidth:200}}>
+                    <div style={{fontWeight:700, color:"#059669", fontSize:13, marginBottom:4}}>✅ {item.nome}</div>
+                    <div style={{fontSize:12, color:"var(--text3)"}}>
+                      Precisa: <strong>{item.qtdNec.toFixed(3)} {item.unidade}</strong>
+                    </div>
+                    <div style={{fontSize:12, color:"var(--text3)"}}>
+                      Estoque: <strong style={{color:"#059669"}}>{item.estoque.toFixed(3)} {item.unidade}</strong>
+                    </div>
+                    {item.estoque - item.qtdNec > 0.001 && (
+                      <div style={{fontSize:11, color:"var(--text4)", marginTop:3}}>
+                        sobra {(item.estoque - item.qtdNec).toFixed(3)} {item.unidade}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+
+      {plano.length > 0 && lista.length === 0 && (
+        <div style={{textAlign:"center", padding:40, color:"var(--text4)", background:"var(--card)", borderRadius:12, border:"1px solid var(--border)"}}>
+          <span style={{fontSize:40}}>🔍</span>
+          <p>Nenhum insumo encontrado nos produtos selecionados. Verifique as fichas técnicas.</p>
+        </div>
+      )}
+
+      {plano.length === 0 && fichasCalc.length > 0 && (
+        <div style={{textAlign:"center", padding:"40px 24px", color:"var(--text4)", background:"var(--card)", borderRadius:12, border:"1px solid var(--border)"}}>
+          <div style={{fontSize:48, marginBottom:12}}>🛍️</div>
+          <p style={{fontWeight:600, fontSize:15, color:"var(--text3)", margin:"0 0 8px"}}>Adicione produtos ao plano de produção</p>
+          <p style={{margin:0, fontSize:13}}>Selecione um produto acima e informe quantas unidades quer produzir.</p>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ── APP PRINCIPAL ──────────────────────────────────────────────────────────
@@ -811,8 +1159,8 @@ export default function App(){
   const cmv=vendas.reduce((s,v)=>{const f=fichasCalc.find(p=>p.id===v.fichaId);return s+(f?v.qtd*f.custo:0);},0);
   const lucBruto=recBruta-cmv,totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0),lucOp=lucBruto-totDesp;
 
-  const ALL_TABS=["🧂 Insumos","📥 Compras","📦 Estoque","📋 Fichas","💰 Preços","🏭 Produção","📝 Pedidos","🛒 Vendas","🏢 Despesas","📊 DRE","🎯 Dashboard","👥 Usuários"];
-  const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length];
+  const ALL_TABS=["🧂 Insumos","📥 Compras","📦 Estoque","📋 Fichas","💰 Preços","🏭 Produção","📝 Pedidos","🛒 Vendas","🏢 Despesas","📊 DRE","🎯 Dashboard","👥 Usuários","🛍️ Lista de Compras"];
+  const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length,null];
 
   if(!currentUser)return <LoginScreen usuarios={usuarios} onLogin={u=>{setCurrentUser(u);setTab(PERMS[u.role].tabs[0]);}}/>;
 
@@ -863,6 +1211,7 @@ export default function App(){
         {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
         {tab===10 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
         {tab===11 && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} currentUser={currentUser}/>}
+        {tab===12 && <ListaComprasTab fichasCalc={fichasCalc} idef={idef} setIdef={setIdef} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
       </div>
     </div>
   );
