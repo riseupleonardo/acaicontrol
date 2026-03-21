@@ -433,12 +433,41 @@ function ProducaoTab({producoes,setProducoes,fichasCalc,idef,estoqueInsumoFn,est
   </>);
 }
 
-function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,estoqueProdutoFn,canConfirmar}){
+function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,estoqueProdutoFn,canConfirmar,idef,custMedioFn}){
   const today=new Date().toISOString().slice(0,10);
-  const blank={fichaId:"",qtd:"",data:today,canal:"Presencial",obs:""};
+  const blank={fichaId:"",qtd:"",data:today,canal:"Presencial",obs:"",usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"",usaTele:false,teleValor:""};
   const [f,setF]=useState(blank);const [filtro,setFiltro]=useState("Todos");
-  function registrar(){if(!f.fichaId)return alert("Selecione o produto.");if(!f.qtd||+f.qtd<=0)return alert("Informe a quantidade.");setPedidos([...pedidos,{id:uid(),fichaId:f.fichaId,qtd:+f.qtd,data:f.data,canal:f.canal,obs:f.obs,status:"Pendente"}]);setF({...blank,data:f.data,canal:f.canal});}
-  function confirmar(pedido){const es=estoqueProdutoFn(pedido.fichaId);if(es<pedido.qtd&&!window.confirm(`⚠️ Estoque: ${es} un. Confirmar?`))return;setPedidos(pedidos.map(p=>p.id===pedido.id?{...p,status:"Confirmado"}:p));setVendas([...vendas,{id:uid(),fichaId:pedido.fichaId,qtd:pedido.qtd,data:pedido.data,pedidoId:pedido.id,embalagemCusto:0,embQtd:0,desconto:0,teleValor:0}]);}
+
+  const insEmb=idef.filter(i=>i.nome.toLowerCase().includes("embalagem")||i.nome.toLowerCase().includes("sacola")||i.nome.toLowerCase().includes("caixa"));
+  const cmEmb=f.embInsumoId?custMedioFn(f.embInsumoId):0;
+  const custoEmb=f.usaEmbalagem&&+f.embQtd>0&&cmEmb>0?cmEmb*(+f.embQtd):0;
+  const prevRec=f.fichaId&&f.qtd&&+f.qtd>0?getPreco(f.fichaId)*(+f.qtd):0;
+
+  function registrar(){
+    if(!f.fichaId)return alert("Selecione o produto.");
+    if(!f.qtd||+f.qtd<=0)return alert("Informe a quantidade.");
+    if(f.usaEmbalagem&&!f.embInsumoId)return alert("Selecione o insumo de embalagem.");
+    if(f.usaEmbalagem&&(!f.embQtd||+f.embQtd<=0))return alert("Informe a quantidade de embalagens.");
+    setPedidos([...pedidos,{
+      id:uid(),fichaId:f.fichaId,qtd:+f.qtd,data:f.data,canal:f.canal,obs:f.obs,status:"Pendente",
+      usaEmbalagem:f.usaEmbalagem,embQtd:f.usaEmbalagem?+f.embQtd:0,embInsumoId:f.embInsumoId,embalagemCusto:custoEmb,
+      usaTele:f.usaTele,teleValor:f.usaTele?+f.teleValor||0:0,
+      desconto:+f.desconto||0,
+    }]);
+    setF({...blank,data:f.data,canal:f.canal});
+  }
+
+  function confirmar(pedido){
+    const es=estoqueProdutoFn(pedido.fichaId);
+    if(es<pedido.qtd&&!window.confirm(`⚠️ Estoque: ${es} un. Confirmar?`))return;
+    setPedidos(pedidos.map(p=>p.id===pedido.id?{...p,status:"Confirmado"}:p));
+    setVendas([...vendas,{
+      id:uid(),fichaId:pedido.fichaId,qtd:pedido.qtd,data:pedido.data,pedidoId:pedido.id,
+      embalagemCusto:pedido.embalagemCusto||0,embQtd:pedido.embQtd||0,embInsumoId:pedido.embInsumoId||"",
+      desconto:pedido.desconto||0,teleValor:pedido.teleValor||0,
+    }]);
+  }
+
   function cancelar(id){if(window.confirm("Cancelar?"))setPedidos(pedidos.map(p=>p.id===id?{...p,status:"Cancelado"}:p));}
   function remover(id){if(window.confirm("Excluir?"))setPedidos(pedidos.filter(p=>p.id!==id));}
   const pend=pedidos.filter(p=>p.status==="Pendente").length,conf=pedidos.filter(p=>p.status==="Confirmado").length,canc=pedidos.filter(p=>p.status==="Cancelado").length;
@@ -447,32 +476,107 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
   const canalCount=CANAIS.map(c=>({canal:c,total:pedidos.filter(p=>p.canal===c).length})).filter(c=>c.total>0);
   const lista=filtro==="Todos"?pedidos:pedidos.filter(p=>p.status===filtro);
   const st=s=>s==="Confirmado"?{color:"#065f46",bg:"#d1fae5",label:"✅ Confirmado"}:s==="Cancelado"?{color:"#991b1b",bg:"#fee2e2",label:"❌ Cancelado"}:{color:"#92400e",bg:"#fef3c7",label:"⏳ Pendente"};
+
   return(<>
     <Card title="➕ Registrar Pedido">
-      <G cols="2fr 1fr 1fr 1fr auto">
+      <G cols="2fr 1fr 1fr 1fr auto" mb={10}>
         <div><Lbl s="Produto *"/><select style={S.inp} value={f.fichaId} onChange={e=>setF({...f,fichaId:e.target.value})}><option value="">Selecione...</option>{fichasCalc.map(p=><option key={p.id} value={p.id}>{p.nome} — {fR(getPreco(p.id))}/un · Est: {estoqueProdutoFn(p.id)} un</option>)}</select></div>
         <div><Lbl s="Quantidade *"/><input style={S.inp} type="number" min="1" step="1" value={f.qtd} onChange={e=>setF({...f,qtd:e.target.value})}/></div>
         <div><Lbl s="Data"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
         <div><Lbl s="Canal"/><select style={S.inp} value={f.canal} onChange={e=>setF({...f,canal:e.target.value})}>{CANAIS.map(c=><option key={c}>{c}</option>)}</select></div>
         <div style={{display:"flex",alignItems:"flex-end"}}><button style={S.btn} onClick={registrar}>+ Registrar</button></div>
       </G>
-      <div><Lbl s="Observações (opcional)"/><input style={{...S.inp,maxWidth:480}} placeholder="Ex: sem granola, entregar às 18h..." value={f.obs} onChange={e=>setF({...f,obs:e.target.value})}/></div>
-      {f.fichaId&&f.qtd&&+f.qtd>0&&<div style={{marginTop:10}}><span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"5px 12px",borderRadius:8}}>💰 Valor: <strong>{fR(getPreco(f.fichaId)*(+f.qtd))}</strong></span></div>}
+
+      {/* Embalagem · Tele · Desconto */}
+      <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:10}}>
+        <G cols="1fr 1fr 1fr" gap={16} mb={0}>
+          {/* Embalagem */}
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <input type="checkbox" id="pedUsaEmb" checked={f.usaEmbalagem} onChange={e=>setF({...f,usaEmbalagem:e.target.checked,embQtd:"",embInsumoId:""})} style={{width:16,height:16,accentColor:"#7c3aed",cursor:"pointer"}}/>
+              <label htmlFor="pedUsaEmb" style={{fontSize:14,fontWeight:600,color:"#7c3aed",cursor:"pointer"}}>📦 Embalagem?</label>
+            </div>
+            {f.usaEmbalagem&&(
+              <G cols="1fr 1fr" gap={8} mb={0}>
+                <div><Lbl s="Insumo de embalagem"/><select style={S.inp} value={f.embInsumoId} onChange={e=>setF({...f,embInsumoId:e.target.value})}><option value="">Selecione...</option>{(insEmb.length?insEmb:idef).map(i=>{const c=custMedioFn(i.id);return<option key={i.id} value={i.id}>{i.nome} — {c>0?fR(c):"sem compras"}/{i.unidade}</option>;})}</select></div>
+                <div><Lbl s="Qtd. de embalagens"/><input style={S.inp} type="number" min="1" step="1" placeholder="Ex: 2" value={f.embQtd} onChange={e=>setF({...f,embQtd:e.target.value})}/></div>
+              </G>
+            )}
+            {f.usaEmbalagem&&f.embInsumoId&&+f.embQtd>0&&cmEmb>0&&<div style={{marginTop:8,fontSize:13,background:"rgba(245,158,11,.1)",color:"#d97706",padding:"6px 12px",borderRadius:8}}>📦 {f.embQtd} un × {fR(cmEmb)} = <strong>{fR(custoEmb)}</strong></div>}
+            {f.usaEmbalagem&&f.embInsumoId&&cmEmb===0&&<p style={{fontSize:12,color:"#ef4444",marginTop:6}}>⚠️ Sem custo médio. Registre uma compra.</p>}
+          </div>
+
+          {/* Tele */}
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <input type="checkbox" id="pedUsaTele" checked={f.usaTele} onChange={e=>setF({...f,usaTele:e.target.checked,teleValor:""})} style={{width:16,height:16,accentColor:"#059669",cursor:"pointer"}}/>
+              <label htmlFor="pedUsaTele" style={{fontSize:14,fontWeight:600,color:"#059669",cursor:"pointer"}}>🛵 Tele entrega?</label>
+            </div>
+            {f.usaTele&&(<>
+              <Lbl s="Valor da tele entrega (R$)"/>
+              <input style={S.inp} type="number" step="0.01" min="0" placeholder="Ex: 5,00" value={f.teleValor} onChange={e=>setF({...f,teleValor:e.target.value})}/>
+              {+f.teleValor>0&&<div style={{marginTop:8,fontSize:13,background:"rgba(5,150,105,.1)",color:"#059669",padding:"6px 12px",borderRadius:8}}>🛵 +{fR(+f.teleValor)} por pedido</div>}
+            </>)}
+          </div>
+
+          {/* Desconto */}
+          <div>
+            <Lbl s="🏷️ Desconto (R$)"/>
+            <input style={S.inp} type="number" step="0.01" min="0" placeholder="0,00" value={f.desconto} onChange={e=>setF({...f,desconto:e.target.value})}/>
+            {+f.desconto>0&&<p style={{fontSize:12,color:"#ef4444",marginTop:6}}>Desconto de <strong>{fR(+f.desconto)}</strong> será aplicado</p>}
+          </div>
+        </G>
+      </div>
+
+      <div style={{marginBottom:10}}><Lbl s="Observações (opcional)"/><input style={{...S.inp,maxWidth:480}} placeholder="Ex: sem granola, entregar às 18h..." value={f.obs} onChange={e=>setF({...f,obs:e.target.value})}/></div>
+
+      {prevRec>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+        <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"5px 12px",borderRadius:8}}>💰 Valor produtos: <strong>{fR(prevRec)}</strong></span>
+        {f.usaTele&&+f.teleValor>0&&<span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.1)",padding:"5px 12px",borderRadius:8}}>🛵 Tele: <strong>+{fR(+f.teleValor)}</strong></span>}
+        {custoEmb>0&&<span style={{fontSize:13,color:"#d97706",background:"rgba(245,158,11,.1)",padding:"5px 12px",borderRadius:8}}>📦 Emb.: <strong>-{fR(custoEmb)}</strong></span>}
+        {+f.desconto>0&&<span style={{fontSize:13,color:"#ef4444",background:"rgba(239,68,68,.1)",padding:"5px 12px",borderRadius:8}}>🏷️ Desc.: <strong>-{fR(+f.desconto)}</strong></span>}
+        <span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.1)",padding:"5px 12px",borderRadius:8,fontWeight:700}}>
+          Total: <strong>{fR(prevRec+(f.usaTele?+f.teleValor||0:0)-custoEmb-(+f.desconto||0))}</strong>
+        </span>
+      </div>}
     </Card>
+
     <G cols="repeat(5,1fr)" gap={12} mb={20}>
       <KPI label="📋 Total" value={pedidos.length} color="#3730a3"/><KPI label="⏳ Pendentes" value={pend} color="#d97706"/><KPI label="✅ Confirmados" value={conf} color="#059669"/><KPI label="❌ Cancelados" value={canc} color="#ef4444"/><KPI label="💵 Rec. Potencial" value={fR(recPot)} color="#7c3aed" sub="(pendentes)"/>
     </G>
     {canalCount.length>0&&<div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 16px",marginBottom:20,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:"#7c3aed"}}>📡 Canais:</span>{canalCount.map(c=><span key={c.canal} style={{background:"var(--accent-soft)",color:"var(--accent-soft-c)",padding:"4px 12px",borderRadius:20,fontSize:13}}>{c.canal}: <strong>{c.total}</strong></span>)}<span style={{marginLeft:"auto",fontSize:13,color:"#059669",fontWeight:600}}>Receita confirmada: {fR(recConf)}</span></div>}
     <Card title={`📋 Pedidos (${pedidos.length})`} right={<div style={{display:"flex",gap:6}}>{["Todos","Pendente","Confirmado","Cancelado"].map(s=><button key={s} onClick={()=>setFiltro(s)} style={{...S.bsm,background:filtro===s?"#7c3aed":"var(--bsm-bg)",color:filtro===s?"white":"#7c3aed",fontWeight:filtro===s?700:500}}>{s}</button>)}</div>}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Data","Produto","Qtd","Canal","Valor","Obs.","Status","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Data","Produto","Qtd","Canal","Valor","📦 Emb.","🛵 Tele","🏷️ Desc.","Obs.","Status","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!lista.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhum pedido {filtro!=="Todos"?`com status "${filtro}"`:"registrado"}.</td></tr>}
-          {[...lista].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(p=>{const fc=fichasCalc.find(f2=>f2.id===p.fichaId),estS=st(p.status);return(
-            <tr key={p.id}><td style={S.td}>{p.data||"—"}</td><td style={{...S.td,fontWeight:500}}>{fc?.nome||"—"}</td><td style={S.td}>{p.qtd} un</td><td style={S.td}><span style={{background:"var(--accent-soft)",color:"var(--accent-soft-c)",padding:"2px 8px",borderRadius:20,fontSize:12}}>{p.canal}</span></td><td style={{...S.td,fontWeight:600,color:"#7c3aed"}}>{fR(p.qtd*getPreco(p.fichaId))}</td><td style={{...S.td,fontSize:12,color:"var(--text4)",maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.obs||"—"}</td><td style={S.td}><Pill label={estS.label} color={estS.color} bg={estS.bg}/></td>
-              <td style={S.td}>{p.status==="Pendente"&&canConfirmar&&<button style={{...S.bsm,background:"#dcfce7",color:"#065f46",border:"1px solid #86efac",marginRight:4}} onClick={()=>confirmar(p)}>✅ Confirmar</button>}{p.status==="Pendente"&&canConfirmar&&<button style={{...S.bsm,color:"#b45309",marginRight:4}} onClick={()=>cancelar(p.id)}>✕ Cancelar</button>}{p.status==="Pendente"&&!canConfirmar&&<span style={{fontSize:12,color:"var(--text4)"}}>Aguardando</span>}<button style={{...S.bsm,color:"#ef4444",marginLeft:4}} onClick={()=>remover(p.id)}>🗑️</button></td>
-            </tr>
-          );})}
+          {!lista.length&&<tr><td colSpan={11} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhum pedido {filtro!=="Todos"?`com status "${filtro}"`:"registrado"}.</td></tr>}
+          {[...lista].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(p=>{
+            const fc=fichasCalc.find(f2=>f2.id===p.fichaId),estS=st(p.status);
+            const i2=idef.find(i=>i.id===p.embInsumoId);
+            return(
+              <tr key={p.id}>
+                <td style={S.td}>{p.data||"—"}</td>
+                <td style={{...S.td,fontWeight:500}}>{fc?.nome||"—"}</td>
+                <td style={S.td}>{p.qtd} un</td>
+                <td style={S.td}><span style={{background:"var(--accent-soft)",color:"var(--accent-soft-c)",padding:"2px 8px",borderRadius:20,fontSize:12}}>{p.canal}</span></td>
+                <td style={{...S.td,fontWeight:600,color:"#7c3aed"}}>{fR(p.qtd*getPreco(p.fichaId))}</td>
+                <td style={S.td}>{(p.embQtd||0)>0
+                  ?<span style={{fontSize:12}}><span style={{color:"#d97706",fontWeight:600}}>📦 {p.embQtd} un</span>{i2&&<><br/><span style={{color:"var(--text4)",fontSize:11}}>{i2.nome} — {fR(p.embalagemCusto||0)}</span></>}</span>
+                  :<span style={{color:"var(--border3)"}}>—</span>}
+                </td>
+                <td style={S.td}>{(p.teleValor||0)>0?<span style={{color:"#059669",fontWeight:600}}>🛵 {fR(p.teleValor)}</span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
+                <td style={S.td}>{(p.desconto||0)>0?<span style={{color:"#ef4444",fontWeight:600}}>-{fR(p.desconto)}</span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
+                <td style={{...S.td,fontSize:12,color:"var(--text4)",maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.obs||"—"}</td>
+                <td style={S.td}><Pill label={estS.label} color={estS.color} bg={estS.bg}/></td>
+                <td style={S.td}>
+                  {p.status==="Pendente"&&canConfirmar&&<button style={{...S.bsm,background:"#dcfce7",color:"#065f46",border:"1px solid #86efac",marginRight:4}} onClick={()=>confirmar(p)}>✅ Confirmar</button>}
+                  {p.status==="Pendente"&&canConfirmar&&<button style={{...S.bsm,color:"#b45309",marginRight:4}} onClick={()=>cancelar(p.id)}>✕ Cancelar</button>}
+                  {p.status==="Pendente"&&!canConfirmar&&<span style={{fontSize:12,color:"var(--text4)"}}>Aguardando</span>}
+                  <button style={{...S.bsm,color:"#ef4444",marginLeft:4}} onClick={()=>remover(p.id)}>🗑️</button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Card>
@@ -1205,7 +1309,7 @@ export default function App(){
         {tab===3  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn}/>}
         {tab===4  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
         {tab===5  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
-        {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido}/>}
+        {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido} idef={idef} custMedioFn={custMedioFn}/>}
         {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} estoqueProdutoFn={estoqueProdutoFn} idef={idef} custMedioFn={custMedioFn}/>}
         {tab===8  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
         {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
