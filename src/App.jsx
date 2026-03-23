@@ -8,6 +8,16 @@ const UNITS  = ["kg","g","litro","L","ml","unidade","cx","pct"];
 const COLORS = ["#7c3aed","#8b5cf6","#a78bfa","#6d28d9","#c4b5fd","#4c1d95","#5b21b6"];
 const CANAIS = ["Presencial","WhatsApp","Instagram","iFood","Telefone","Outro"];
 const MESES  = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const PAGAMENTOS_SAIDA  = ["Pix RiseUp","Cartão Léo","Cartão Victor","Dinheiro"];
+const PAGAMENTOS_ENTRADA= ["Dinheiro","Pix","Cartão"];
+const PAG_CORES = {
+  "Pix RiseUp":  {bg:"#ede9fe",c:"#5b21b6"},
+  "Cartão Léo":  {bg:"#dbeafe",c:"#1e40af"},
+  "Cartão Victor":{bg:"#fce7f3",c:"#9d174d"},
+  "Dinheiro":    {bg:"#dcfce7",c:"#065f46"},
+  "Pix":         {bg:"#ede9fe",c:"#5b21b6"},
+  "Cartão":      {bg:"#dbeafe",c:"#1e40af"},
+};
 const COMPAT = {kg:["kg","g"],g:["g","kg"],litro:["litro","L","ml"],L:["litro","L","ml"],ml:["ml","litro","L"],unidade:["unidade"],cx:["cx"],pct:["pct"]};
 const FACTORS = {kg:1,g:0.001,litro:1,L:1,ml:0.001};
 const cvt = (qty,from,to) => { if(from===to)return qty; const f=FACTORS[from],t=FACTORS[to]; return (f!=null&&t!=null)?qty*f/t:qty; };
@@ -18,9 +28,9 @@ const getItems = r => (r.items&&r.items.length) ? r.items : (r.fichaId ? [{ficha
 const ROLES = {Admin:"Admin",Comprador:"Comprador",Vendedor:"Vendedor"};
 const ROLE_COLORS = {Admin:{bg:"#ede9fe",color:"#5b21b6"},Comprador:{bg:"#dbeafe",color:"#1e40af"},Vendedor:{bg:"#dcfce7",color:"#166534"}};
 const PERMS = {
-  Admin:     {tabs:[0,1,2,3,4,5,6,7,8,9,10,11,12,13],editPrecos:true, canConfirmarPedido:true},
-  Comprador: {tabs:[1,2,5,6,7,12,13],                 editPrecos:false,canConfirmarPedido:true},
-  Vendedor:  {tabs:[4,6,13],                           editPrecos:false,canConfirmarPedido:false},
+  Admin:     {tabs:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14],editPrecos:true, canConfirmarPedido:true},
+  Comprador: {tabs:[1,2,5,6,7,12,13,14],                 editPrecos:false,canConfirmarPedido:true},
+  Vendedor:  {tabs:[4,6,13],                              editPrecos:false,canConfirmarPedido:false},
 };
 const canTab = (role,idx) => PERMS[role]?.tabs.includes(idx)??false;
 
@@ -194,30 +204,17 @@ function InsumosDefTab({idef,setIdef}){
 
 function ComprasTab({entradas,setEntradas,idef}){
   const today=new Date().toISOString().slice(0,10);
-  const blank={insumoId:"",numEmb:"",precoUnit:"",data:today};
+  const blank={insumoId:"",numEmb:"",precoUnit:"",data:today,pagamento:"Pix RiseUp"};
   const [f,setF]=useState(blank);
 
   const ins=idef.find(i=>i.id===f.insumoId);
-  const cap=ins?.capacidadeUnitaria; // tamanho da embalagem em unidade base
-
-  // Qty total na unidade base
+  const cap=ins?.capacidadeUnitaria;
   const qtdTotal = cap&&+f.numEmb>0 ? +f.numEmb*+cap : +f.numEmb||0;
-  // Custo total
   const custoTotal = +f.numEmb>0&&+f.precoUnit>0 ? +f.numEmb*(+f.precoUnit) : 0;
-  // Custo por unidade base
   const custoUnitBase = qtdTotal>0&&custoTotal>0 ? custoTotal/qtdTotal : null;
 
-  function cmAtual(iid){
-    const es=entradas.filter(e=>e.insumoId===iid);
-    const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);
-    return tQ>0?tC/tQ:0;
-  }
-  function novoCM(){
-    const es=entradas.filter(e=>e.insumoId===f.insumoId);
-    const tQ=es.reduce((s,e)=>s+e.qtd,0)+qtdTotal;
-    const tC=es.reduce((s,e)=>s+e.custoTotal,0)+custoTotal;
-    return tQ>0?tC/tQ:0;
-  }
+  function cmAtual(iid){const es=entradas.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
+  function novoCM(){const es=entradas.filter(e=>e.insumoId===f.insumoId);const tQ=es.reduce((s,e)=>s+e.qtd,0)+qtdTotal,tC=es.reduce((s,e)=>s+e.custoTotal,0)+custoTotal;return tQ>0?tC/tQ:0;}
 
   function salvar(){
     if(!f.insumoId)return alert("Selecione o insumo.");
@@ -228,12 +225,12 @@ function ComprasTab({entradas,setEntradas,idef}){
       qtd:+qtdTotal.toFixed(6),
       custoTotal:+custoTotal.toFixed(4),
       data:f.data,
-      // campos extras para exibição no histórico
+      pagamento:f.pagamento,
       numEmb:+f.numEmb,
       precoUnit:+f.precoUnit,
       capUsada:cap||null,
     }]);
-    setF({...blank,data:f.data});
+    setF({...blank,data:f.data,pagamento:f.pagamento});
   }
 
   const cmAtu=f.insumoId?cmAtual(f.insumoId):0;
@@ -247,11 +244,10 @@ function ComprasTab({entradas,setEntradas,idef}){
         Informe a <strong>quantidade de embalagens</strong> compradas e o <strong>preço por embalagem</strong>. Se o insumo tiver capacidade unitária cadastrada, o sistema converte automaticamente para a unidade base.
       </p>
 
-      {/* Linha 1: Insumo + Data */}
-      <G cols="3fr 1fr" gap={10} mb={10}>
+      <G cols="3fr 1fr 1fr" gap={10} mb={10}>
         <div>
           <Lbl s="Insumo *"/>
-          <select style={S.inp} value={f.insumoId} onChange={e=>setF({...blank,data:f.data,insumoId:e.target.value})}>
+          <select style={S.inp} value={f.insumoId} onChange={e=>setF({...blank,data:f.data,pagamento:f.pagamento,insumoId:e.target.value})}>
             <option value="">Selecione...</option>
             {idef.map(i=>{
               const c=cmAtual(i.id);
@@ -261,150 +257,68 @@ function ComprasTab({entradas,setEntradas,idef}){
           </select>
         </div>
         <div><Lbl s="Data"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
+        <div>
+          <Lbl s="💳 Meio de pagamento"/>
+          <select style={S.inp} value={f.pagamento} onChange={e=>setF({...f,pagamento:e.target.value})}>
+            {PAGAMENTOS_SAIDA.map(p=><option key={p}>{p}</option>)}
+          </select>
+        </div>
       </G>
 
-      {/* Linha 2: campos de quantidade e preço */}
       {f.insumoId&&(
         <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:12}}>
           <G cols="1fr 1fr auto" gap={10} mb={0}>
-
-            {/* Qtd de embalagens */}
             <div>
               <Lbl s={cap?`Nº de embalagens compradas`:`Quantidade comprada (${ins?.unidade||""})`}/>
-              <div style={{position:"relative"}}>
-                <input
-                  style={S.inp}
-                  type="number" step="1" min="1"
-                  placeholder={cap?"Ex: 5 embalagens":"Ex: 10"}
-                  value={f.numEmb}
-                  onChange={e=>setF({...f,numEmb:e.target.value})}
-                />
-              </div>
-              {cap&&+f.numEmb>0&&(
-                <div style={{marginTop:6,fontSize:12,color:"#7c3aed",background:"var(--accent-soft)",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>
-                  {f.numEmb} emb. × {cap} {ins?.unidade} = <strong>{qtdTotal.toFixed(3)} {ins?.unidade}</strong> no estoque
-                </div>
-              )}
-              {!cap&&ins&&(
-                <p style={{margin:"4px 0 0",fontSize:11,color:"#d97706"}}>
-                  💡 Defina a capacidade unitária em <strong>🧂 Insumos</strong> para calcular por embalagem.
-                </p>
-              )}
+              <input style={S.inp} type="number" step="1" min="1" placeholder={cap?"Ex: 5 embalagens":"Ex: 10"} value={f.numEmb} onChange={e=>setF({...f,numEmb:e.target.value})}/>
+              {cap&&+f.numEmb>0&&(<div style={{marginTop:6,fontSize:12,color:"#7c3aed",background:"var(--accent-soft)",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>{f.numEmb} emb. × {cap} {ins?.unidade} = <strong>{qtdTotal.toFixed(3)} {ins?.unidade}</strong> no estoque</div>)}
+              {!cap&&ins&&(<p style={{margin:"4px 0 0",fontSize:11,color:"#d97706"}}>💡 Defina a capacidade unitária em <strong>🧂 Insumos</strong> para calcular por embalagem.</p>)}
             </div>
-
-            {/* Preço unitário */}
             <div>
               <Lbl s={cap?"Preço por embalagem (R$)":"Preço por unidade (R$)"}/>
-              <input
-                style={S.inp}
-                type="number" step="0.01" min="0"
-                placeholder={cap?"Ex: 18,00 / embalagem":"Ex: 5,00 / "+ins?.unidade}
-                value={f.precoUnit}
-                onChange={e=>setF({...f,precoUnit:e.target.value})}
-              />
-              {cap&&+f.precoUnit>0&&qtdTotal>0&&(
-                <div style={{marginTop:6,fontSize:12,color:"#059669",background:"rgba(5,150,105,.08)",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>
-                  {fR(+f.precoUnit)} ÷ {cap} {ins?.unidade} = <strong>{fR(+f.precoUnit/+cap)}/{ins?.unidade}</strong>
-                </div>
-              )}
+              <input style={S.inp} type="number" step="0.01" min="0" placeholder={cap?"Ex: 18,00 / embalagem":"Ex: 5,00 / "+ins?.unidade} value={f.precoUnit} onChange={e=>setF({...f,precoUnit:e.target.value})}/>
+              {cap&&+f.precoUnit>0&&qtdTotal>0&&(<div style={{marginTop:6,fontSize:12,color:"#059669",background:"rgba(5,150,105,.08)",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>{fR(+f.precoUnit)} ÷ {cap} {ins?.unidade} = <strong>{fR(+f.precoUnit/+cap)}/{ins?.unidade}</strong></div>)}
             </div>
-
-            {/* Botão */}
             <div style={{display:"flex",alignItems:"flex-end"}}>
-              <button style={{...S.btn,opacity:pronto?1:.5,cursor:pronto?"pointer":"not-allowed"}} onClick={salvar} disabled={!pronto}>
-                + Registrar
-              </button>
+              <button style={{...S.btn,opacity:pronto?1:.5,cursor:pronto?"pointer":"not-allowed"}} onClick={salvar} disabled={!pronto}>+ Registrar</button>
             </div>
           </G>
         </div>
       )}
 
-      {/* Preview calculado */}
       {pronto&&ins&&(
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-          {cap&&(
-            <span style={{fontSize:13,color:"#3730a3",background:"rgba(55,48,163,.08)",padding:"6px 14px",borderRadius:8,border:"1px solid rgba(55,48,163,.2)"}}>
-              📦 <strong>{f.numEmb}</strong> embalagem{+f.numEmb!==1?"s":""} de <strong>{cap} {ins.unidade}</strong>
-            </span>
-          )}
-          <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"6px 14px",borderRadius:8}}>
-            📊 Qtd. total: <strong>{qtdTotal.toFixed(3)} {ins.unidade}</strong>
-          </span>
-          <span style={{fontSize:13,color:"#1d4ed8",background:"rgba(29,78,216,.07)",padding:"6px 14px",borderRadius:8}}>
-            💰 Total pago: <strong>{fR(custoTotal)}</strong>
-          </span>
-          {custoUnitBase!==null&&(
-            <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"6px 14px",borderRadius:8,fontWeight:600}}>
-              🔖 Custo/{ins.unidade}: <strong>{fR(custoUnitBase)}</strong>
-            </span>
-          )}
-          {cmAtu>0&&(
-            <span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.08)",padding:"6px 14px",borderRadius:8,border:"1px solid #6ee7b7"}}>
-              📈 Novo custo médio: <strong>{fR(novoCM())}/{ins.unidade}</strong>
-              <span style={{color:"var(--text4)",marginLeft:6,fontSize:11}}>(era {fR(cmAtu)})</span>
-            </span>
-          )}
+          {cap&&(<span style={{fontSize:13,color:"#3730a3",background:"rgba(55,48,163,.08)",padding:"6px 14px",borderRadius:8,border:"1px solid rgba(55,48,163,.2)"}}>📦 <strong>{f.numEmb}</strong> emb. de <strong>{cap} {ins.unidade}</strong></span>)}
+          <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"6px 14px",borderRadius:8}}>📊 Total: <strong>{qtdTotal.toFixed(3)} {ins.unidade}</strong></span>
+          <span style={{fontSize:13,color:"#1d4ed8",background:"rgba(29,78,216,.07)",padding:"6px 14px",borderRadius:8}}>💰 Pago: <strong>{fR(custoTotal)}</strong></span>
+          {custoUnitBase!==null&&(<span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"6px 14px",borderRadius:8,fontWeight:600}}>🔖 <strong>{fR(custoUnitBase)}/{ins.unidade}</strong></span>)}
+          {cmAtu>0&&(<span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.08)",padding:"6px 14px",borderRadius:8,border:"1px solid #6ee7b7"}}>📈 Novo CM: <strong>{fR(novoCM())}/{ins.unidade}</strong> <span style={{color:"var(--text4)",fontSize:11}}>(era {fR(cmAtu)})</span></span>)}
+          {(()=>{const pc=PAG_CORES[f.pagamento];return pc&&<span style={{fontSize:13,background:pc.bg,color:pc.c,padding:"6px 14px",borderRadius:8,fontWeight:600}}>💳 {f.pagamento}</span>;})()}
         </div>
       )}
     </Card>
 
-    {/* Histórico */}
     <Card title={`📋 Histórico de Compras (${entradas.length})`}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead>
-          <tr>{["Data","Insumo","Unidades compradas","Qtd. em estoque","Preço/emb.","Custo/un. base","Total pago","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr>
-        </thead>
+        <thead><tr>{["Data","Insumo","Embalagens","Qtd. total","Preço/emb.","Custo/un","Total pago","💳 Pagamento","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!entradas.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhuma compra registrada.</td></tr>}
+          {!entradas.length&&<tr><td colSpan={9} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhuma compra registrada.</td></tr>}
           {[...entradas].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(e=>{
             const i2=idef.find(i=>i.id===e.insumoId);
             const custUnit=e.qtd>0?e.custoTotal/e.qtd:0;
-            // Compatibilidade: entradas antigas não têm numEmb/precoUnit
             const temEmb=e.numEmb&&e.capUsada;
+            const pc=PAG_CORES[e.pagamento];
             return(
               <tr key={e.id}>
                 <td style={S.td}>{e.data||"—"}</td>
                 <td style={{...S.td,fontWeight:600}}>{i2?.nome||"—"}</td>
-
-                {/* Unidades compradas */}
-                <td style={S.td}>
-                  {temEmb?(
-                    <div>
-                      <span style={{fontWeight:700,color:"#3730a3"}}>{e.numEmb}</span>
-                      <span style={{color:"var(--text4)",fontSize:12,marginLeft:4}}>emb.</span>
-                      <div style={{fontSize:11,color:"var(--text4)",marginTop:2}}>de {e.capUsada} {i2?.unidade} cada</div>
-                    </div>
-                  ):(
-                    <span style={{color:"var(--text4)",fontSize:12}}>—</span>
-                  )}
-                </td>
-
-                {/* Qtd base */}
-                <td style={S.td}>
-                  <span style={{fontWeight:700,color:"#059669"}}>{(+e.qtd).toFixed(3)}</span>
-                  <span style={{color:"var(--text4)",fontSize:12,marginLeft:4}}>{i2?.unidade}</span>
-                </td>
-
-                {/* Preço por embalagem */}
-                <td style={S.td}>
-                  {temEmb?(
-                    <span style={{color:"#1d4ed8",fontWeight:600}}>{fR(e.precoUnit)}</span>
-                  ):(
-                    <span style={{color:"var(--text4)",fontSize:12}}>—</span>
-                  )}
-                </td>
-
-                {/* Custo/un base */}
-                <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>
-                  {custUnit>0?`${fR(custUnit)}/${i2?.unidade}`:"—"}
-                </td>
-
-                {/* Total pago */}
+                <td style={S.td}>{temEmb?(<div><span style={{fontWeight:700,color:"#3730a3"}}>{e.numEmb}</span><span style={{color:"var(--text4)",fontSize:12,marginLeft:4}}>emb.</span><div style={{fontSize:11,color:"var(--text4)",marginTop:2}}>de {e.capUsada} {i2?.unidade} cada</div></div>):<span style={{color:"var(--text4)",fontSize:12}}>—</span>}</td>
+                <td style={S.td}><span style={{fontWeight:700,color:"#059669"}}>{(+e.qtd).toFixed(3)}</span><span style={{color:"var(--text4)",fontSize:12,marginLeft:4}}>{i2?.unidade}</span></td>
+                <td style={S.td}>{temEmb?<span style={{color:"#1d4ed8",fontWeight:600}}>{fR(e.precoUnit)}</span>:<span style={{color:"var(--text4)",fontSize:12}}>—</span>}</td>
+                <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>{custUnit>0?`${fR(custUnit)}/${i2?.unidade}`:"—"}</td>
                 <td style={{...S.td,fontWeight:600,color:"#1d4ed8"}}>{fR(e.custoTotal)}</td>
-
-                <td style={S.td}>
-                  <button style={{...S.bsm,color:"#ef4444"}} onClick={()=>{if(window.confirm("Remover esta compra?"))setEntradas(entradas.filter(x=>x.id!==e.id))}}>🗑️</button>
-                </td>
+                <td style={S.td}>{e.pagamento?<span style={{background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{e.pagamento}</span>:<span style={{color:"var(--text4)",fontSize:12}}>—</span>}</td>
+                <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>{if(window.confirm("Remover?"))setEntradas(entradas.filter(x=>x.id!==e.id))}}>🗑️</button></td>
               </tr>
             );
           })}
@@ -855,7 +769,7 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
 
 function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,custMedioFn}){
   const today=new Date().toISOString().slice(0,10);
-  const blankOrder={data:today,usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"",usaTele:false,teleValor:""};
+  const blankOrder={data:today,usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"",usaTele:false,teleValor:"",pagamento:"Dinheiro"};
   const blankItem={fichaId:"",qtd:""};
   const [f,setF]=useState(blankOrder);
   const [nItem,setNItem]=useState(blankItem);
@@ -899,9 +813,10 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
       id:uid(),items:carrinho,data:f.data,
       embalagemCusto:custoEmb,embQtd:f.usaEmbalagem?+f.embQtd:0,embInsumoId:f.embInsumoId,
       desconto:+f.desconto||0,teleValor:f.usaTele?+f.teleValor||0:0,
+      pagamento:f.pagamento,
     }]);
     setCarrinho([]);
-    setF({...blankOrder,data:f.data});
+    setF({...blankOrder,data:f.data,pagamento:f.pagamento});
   }
   function remover(id){if(window.confirm("Remover venda?"))setVendas(vendas.filter(v=>v.id!==id));}
 
@@ -958,9 +873,15 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
             )}
           </div>
 
-          {/* Data + Embalagem/Tele/Desconto */}
-          <G cols="1fr 1fr 1fr 1fr" gap={10} mb={10}>
+          {/* Data + Pagamento */}
+          <G cols="1fr 1fr" gap={10} mb={10}>
             <div><Lbl s="Data da venda"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
+            <div>
+              <Lbl s="💳 Meio de pagamento"/>
+              <select style={S.inp} value={f.pagamento} onChange={e=>setF({...f,pagamento:e.target.value})}>
+                {PAGAMENTOS_ENTRADA.map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
           </G>
           <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:10}}>
             <G cols="1fr 1fr 1fr" gap={16} mb={0}>
@@ -1020,29 +941,25 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
 
     <Card title={`📋 Vendas (${vendas.length})`}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Data","Itens Vendidos","Receita","🛵 Tele","Embalagem","Desconto","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Data","Itens Vendidos","Receita","💳 Pagamento","🛵 Tele","Embalagem","Desconto","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!vendas.length&&<tr><td colSpan={7} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhuma venda registrada.</td></tr>}
+          {!vendas.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhuma venda registrada.</td></tr>}
           {vendas.map(v=>{
             const its=getItems(v);
             const recV=its.reduce((s,i)=>s+i.qtd*getPreco(i.fichaId),0);
             const i2=idef.find(i=>i.id===v.embInsumoId);
+            const pc=PAG_CORES[v.pagamento];
             return(
               <tr key={v.id}>
                 <td style={S.td}>{v.data||"—"}</td>
                 <td style={S.td}>
                   {its.map((item,idx)=>{
                     const fc=fichasCalc.find(p=>p.id===item.fichaId);
-                    return(
-                      <div key={item.fichaId||idx} style={{fontSize:13,marginBottom:idx<its.length-1?4:0,display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontWeight:600}}>{fc?.nome||"—"}</span>
-                        <span style={{background:"var(--accent-soft)",color:"#7c3aed",padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700}}>{item.qtd} un</span>
-                        <span style={{color:"var(--text4)",fontSize:11}}>{fR(item.qtd*getPreco(item.fichaId))}</span>
-                      </div>
-                    );
+                    return(<div key={item.fichaId||idx} style={{fontSize:13,marginBottom:idx<its.length-1?4:0,display:"flex",alignItems:"center",gap:6}}><span style={{fontWeight:600}}>{fc?.nome||"—"}</span><span style={{background:"var(--accent-soft)",color:"#7c3aed",padding:"1px 7px",borderRadius:20,fontSize:11,fontWeight:700}}>{item.qtd} un</span><span style={{color:"var(--text4)",fontSize:11}}>{fR(item.qtd*getPreco(item.fichaId))}</span></div>);
                   })}
                 </td>
                 <td style={{...S.td,fontWeight:700,color:"#059669"}}>{fR(recV)}</td>
+                <td style={S.td}>{v.pagamento?<span style={{background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{v.pagamento}</span>:<span style={{color:"var(--text4)",fontSize:12}}>—</span>}</td>
                 <td style={S.td}>{(v.teleValor||0)>0?<span style={{color:"#059669",fontWeight:600}}>🛵 {fR(v.teleValor)}</span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
                 <td style={S.td}>{(v.embQtd||0)>0?<span style={{fontSize:12}}><span style={{color:"#d97706",fontWeight:600}}>📦 {v.embQtd} un</span><br/><span style={{color:"var(--text4)",fontSize:11}}>{i2?.nome||""} — {fR(v.embalagemCusto)}</span></span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
                 <td style={S.td}>{(v.desconto||0)>0?<span style={{color:"#ef4444",fontWeight:600}}>-{fR(v.desconto)}</span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
@@ -1054,6 +971,7 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
             <tr style={{background:"rgba(5,150,105,.06)"}}>
               <td colSpan={2} style={{...S.td,fontWeight:700,textAlign:"right",color:"#065f46"}}>Totais:</td>
               <td style={{...S.td,fontWeight:700,color:"#059669",fontSize:15}}>{fR(totRec)}</td>
+              <td style={S.td}/>
               <td style={{...S.td,color:"#059669",fontWeight:600}}>{totTele>0?fR(totTele):"—"}</td>
               <td style={{...S.td,color:"#d97706",fontWeight:600}}>{totEmb>0?fR(totEmb):"—"}</td>
               <td style={{...S.td,color:"#ef4444",fontWeight:600}}>{totDesc>0?`-${fR(totDesc)}`:"—"}</td>
@@ -1798,6 +1716,196 @@ function ClientesTab({pedidos,fichasCalc,getPreco}){
   </>);
 }
 
+// ── FLUXO DE CAIXA ─────────────────────────────────────────────────────────
+function FluxoCaixaTab({entradas,vendas,fichasCalc,getPreco,idef}){
+  const now=new Date();
+  const [mes,setMes]=useState(now.getMonth()+1);
+  const [ano,setAno]=useState(now.getFullYear());
+  const [filtroAtivo,setFiltroAtivo]=useState(false);
+  const [filtPag,setFiltPag]=useState("Todos");
+
+  // Monta lista unificada de movimentos
+  const saidas=entradas.map(e=>{
+    const i2=idef.find(i=>i.id===e.insumoId);
+    return{
+      id:e.id,tipo:"saída",data:e.data||"",
+      descricao:`Compra: ${i2?.nome||"?"}`,
+      detalhe:e.numEmb?`${e.numEmb} emb. × ${fR(e.precoUnit)}`:"",
+      valor:e.custoTotal,
+      pagamento:e.pagamento||"—",
+    };
+  });
+
+  const entradas2=vendas.map(v=>{
+    const its=getItems(v);
+    const rec=its.reduce((s,i)=>s+i.qtd*getPreco(i.fichaId),0);
+    const nomes=its.map(i=>{const fc=fichasCalc.find(f=>f.id===i.fichaId);return `${fc?.nome||"?"}(${i.qtd})`;}).join(", ");
+    const tele=v.teleValor||0;
+    const desc=v.desconto||0;
+    const total=rec+tele-desc;
+    return{
+      id:v.id,tipo:"entrada",data:v.data||"",
+      descricao:`Venda: ${nomes}`,
+      detalhe:[tele>0?`+tele ${fR(tele)}`:"",desc>0?`-desc ${fR(desc)}`:""].filter(Boolean).join(" "),
+      valor:total,
+      pagamento:v.pagamento||"—",
+    };
+  });
+
+  let movimentos=[...saidas,...entradas2].sort((a,b)=>{
+    if(a.data!==b.data)return (b.data||"").localeCompare(a.data||"");
+    return a.tipo==="entrada"?-1:1;
+  });
+
+  // Filtros
+  if(filtroAtivo){
+    movimentos=movimentos.filter(m=>{
+      if(!m.data)return false;
+      const[y,mo]=m.data.split("-");
+      return +mo===mes&&+y===ano;
+    });
+  }
+  if(filtPag!=="Todos"){
+    const tipo=filtPag==="Entradas"?"entrada":filtPag==="Saídas"?"saída":null;
+    if(tipo)movimentos=movimentos.filter(m=>m.tipo===tipo);
+    else movimentos=movimentos.filter(m=>m.pagamento===filtPag);
+  }
+
+  const totalEntradas=movimentos.filter(m=>m.tipo==="entrada").reduce((s,m)=>s+m.valor,0);
+  const totalSaidas=movimentos.filter(m=>m.tipo==="saída").reduce((s,m)=>s+m.valor,0);
+  const saldo=totalEntradas-totalSaidas;
+
+  // Saldo acumulado por movimento (em ordem cronológica ascendente)
+  const cronologico=[...movimentos].reverse();
+  let acc=0;
+  const comSaldo=cronologico.map(m=>{
+    acc+= m.tipo==="entrada"?m.valor:-m.valor;
+    return{...m,saldoAcum:acc};
+  }).reverse();
+
+  // Breakdown por meio de pagamento
+  const porMeio={};
+  movimentos.forEach(m=>{
+    const k=m.pagamento||"—";
+    if(!porMeio[k])porMeio[k]={pag:k,entradas:0,saidas:0};
+    if(m.tipo==="entrada")porMeio[k].entradas+=m.valor;
+    else porMeio[k].saidas+=m.valor;
+  });
+  const breakdownMeio=Object.values(porMeio).sort((a,b)=>(b.entradas+b.saidas)-(a.entradas+a.saidas));
+
+  const anosDisp=[...new Set([...entradas,...vendas].map(x=>x.data?.slice(0,4)).filter(Boolean))].sort();
+  const todosMetodos=["Todos","Entradas","Saídas",...PAGAMENTOS_SAIDA,...PAGAMENTOS_ENTRADA.filter(p=>!PAGAMENTOS_SAIDA.includes(p))];
+
+  return(<>
+    {/* Filtros */}
+    <Card title="🗓️ Filtros">
+      <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <input type="checkbox" id="fcFiltro" checked={filtroAtivo} onChange={e=>setFiltroAtivo(e.target.checked)} style={{width:16,height:16,accentColor:"#7c3aed",cursor:"pointer"}}/>
+          <label htmlFor="fcFiltro" style={{fontSize:14,fontWeight:600,color:"#7c3aed",cursor:"pointer"}}>Filtrar por período</label>
+        </div>
+        <div style={{display:"flex",gap:8,opacity:filtroAtivo?1:.4,pointerEvents:filtroAtivo?"auto":"none"}}>
+          <div><Lbl s="Mês"/><select style={{...S.inp,width:150}} value={mes} onChange={e=>setMes(+e.target.value)}>{MESES.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}</select></div>
+          <div><Lbl s="Ano"/><select style={{...S.inp,width:100}} value={ano} onChange={e=>setAno(+e.target.value)}>{[...new Set([...anosDisp,String(now.getFullYear())])].sort().map(a=><option key={a} value={a}>{a}</option>)}</select></div>
+        </div>
+        <div>
+          <Lbl s="Tipo / Pagamento"/>
+          <select style={{...S.inp,width:180}} value={filtPag} onChange={e=>setFiltPag(e.target.value)}>
+            {todosMetodos.map(m=><option key={m}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+    </Card>
+
+    {/* KPIs */}
+    <G cols="repeat(4,1fr)" gap={12} mb={20}>
+      <KPI label="📥 Total Entradas" value={fR(totalEntradas)} color="#059669"/>
+      <KPI label="📤 Total Saídas" value={fR(totalSaidas)} color="#ef4444"/>
+      <KPI label="💰 Saldo do período" value={fR(saldo)} color={saldo>=0?"#1d4ed8":"#ef4444"} sub={saldo>=0?"✅ Positivo":"⚠️ Negativo"}/>
+      <KPI label="🔄 Movimentos" value={movimentos.length} color="#7c3aed"/>
+    </G>
+
+    {/* Breakdown por meio de pagamento */}
+    {breakdownMeio.length>0&&(
+      <Card title="💳 Por meio de pagamento">
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+          {breakdownMeio.map(b=>{
+            const pc=PAG_CORES[b.pag];
+            const sl=b.entradas-b.saidas;
+            return(
+              <div key={b.pag} style={{background:pc?pc.bg:"var(--card2)",border:`1px solid ${pc?"var(--border2)":"var(--border)"}`,borderRadius:12,padding:"14px 18px",minWidth:180,flex:"1 1 180px"}}>
+                <p style={{margin:"0 0 8px",fontWeight:700,fontSize:14,color:pc?.c||"var(--text)"}}>{b.pag}</p>
+                {b.entradas>0&&<p style={{margin:"0 0 2px",fontSize:13,color:"#059669"}}>↑ Entradas: <strong>{fR(b.entradas)}</strong></p>}
+                {b.saidas>0&&<p style={{margin:"0 0 2px",fontSize:13,color:"#ef4444"}}>↓ Saídas: <strong>{fR(b.saidas)}</strong></p>}
+                <p style={{margin:"6px 0 0",fontSize:13,fontWeight:700,color:sl>=0?"#1d4ed8":"#ef4444",borderTop:"1px solid rgba(0,0,0,.08)",paddingTop:6}}>Saldo: {fR(sl)}</p>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    )}
+
+    {/* Extrato */}
+    <Card title={`📋 Extrato (${comSaldo.length} movimentos)`}>
+      {!comSaldo.length&&(
+        <div style={{textAlign:"center",padding:32,color:"var(--text4)"}}>Nenhum movimento no período.</div>
+      )}
+      {comSaldo.length>0&&(
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
+          <thead>
+            <tr>{["Data","Tipo","Descrição","Detalhe","💳 Pagamento","Valor","Saldo acum."].map(h=><th key={h} style={S.th}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {comSaldo.map((m,idx)=>{
+              const isE=m.tipo==="entrada";
+              const pc=PAG_CORES[m.pagamento];
+              return(
+                <tr key={m.id+idx} style={{background:isE?"rgba(5,150,105,.03)":"rgba(239,68,68,.03)"}}>
+                  <td style={{...S.td,whiteSpace:"nowrap",fontWeight:600}}>{m.data||"—"}</td>
+                  <td style={S.td}>
+                    <span style={{
+                      background:isE?"rgba(5,150,105,.12)":"rgba(239,68,68,.12)",
+                      color:isE?"#065f46":"#991b1b",
+                      padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:700,
+                    }}>
+                      {isE?"📥 Entrada":"📤 Saída"}
+                    </span>
+                  </td>
+                  <td style={{...S.td,fontWeight:500}}>{m.descricao}</td>
+                  <td style={{...S.td,fontSize:12,color:"var(--text4)"}}>{m.detalhe||"—"}</td>
+                  <td style={S.td}>
+                    {m.pagamento&&m.pagamento!=="—"
+                      ?<span style={{background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{m.pagamento}</span>
+                      :<span style={{color:"var(--text4)",fontSize:12}}>—</span>
+                    }
+                  </td>
+                  <td style={{...S.td,fontWeight:700,fontSize:14,color:isE?"#059669":"#ef4444",whiteSpace:"nowrap"}}>
+                    {isE?"+":"-"}{fR(m.valor)}
+                  </td>
+                  <td style={{...S.td,fontWeight:700,color:m.saldoAcum>=0?"#1d4ed8":"#ef4444",whiteSpace:"nowrap"}}>
+                    {fR(m.saldoAcum)}
+                  </td>
+                </tr>
+              );
+            })}
+            {/* Linha de totais */}
+            <tr style={{background:"var(--card2)",borderTop:"2px solid var(--border3)"}}>
+              <td colSpan={5} style={{...S.td,fontWeight:700,textAlign:"right",color:"var(--text2)"}}>Totais do período:</td>
+              <td style={{...S.td,fontWeight:700,fontSize:14}}>
+                <span style={{color:"#059669",display:"block"}}>+{fR(totalEntradas)}</span>
+                <span style={{color:"#ef4444",display:"block"}}>-{fR(totalSaidas)}</span>
+              </td>
+              <td style={{...S.td,fontWeight:800,fontSize:15,color:saldo>=0?"#1d4ed8":"#ef4444"}}>
+                {fR(saldo)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+    </Card>
+  </>);
+}
+
 // ── APP PRINCIPAL ──────────────────────────────────────────────────────────
 const DEFAULT_ADMIN=[{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}];
 
@@ -1863,10 +1971,11 @@ export default function App(){
     {idx:11,icon:"👥", label:"Usuários"},
     {idx:12,icon:"🛍️", label:"Lista de Compras"},
     {idx:13,icon:"👤", label:"Clientes"},
+    {idx:14,icon:"💵", label:"Fluxo de Caixa"},
   ];
 
   const ALL_TABS=["🧂 Insumos","📥 Compras","📦 Estoque","📋 Fichas","💰 Preços","🏭 Produção","📝 Pedidos","🛒 Vendas","🏢 Despesas","📊 DRE","🎯 Dashboard","👥 Usuários","🛍️ Lista de Compras","👤 Clientes"];
-  const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length,null,null];
+  const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length,null,null,null];
 
   if(!currentUser)return <LoginScreen usuarios={usuarios} onLogin={u=>{setCurrentUser(u);setTab(PERMS[u.role].tabs[0]);}}/>;
 
@@ -2070,6 +2179,7 @@ export default function App(){
           {tab===11 && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} currentUser={currentUser}/>}
           {tab===12 && <ListaComprasTab fichasCalc={fichasCalc} idef={idef} setIdef={setIdef} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
           {tab===13 && <ClientesTab pedidos={pedidos} fichasCalc={fichasCalc} getPreco={getPreco}/>}
+          {tab===14 && <FluxoCaixaTab entradas={entradas} vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} idef={idef}/>}
         </div>
       </div>
     </div>
