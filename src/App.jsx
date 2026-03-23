@@ -1845,60 +1845,232 @@ export default function App(){
   const cmv=vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>{const f=fichasCalc.find(p=>p.id===i.fichaId);return ss+(f?i.qtd*f.custo:0);},0),0);
   const lucBruto=recBruta-cmv,totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0),lucOp=lucBruto-totDesp;
 
+  const [sidebarOpen,setSidebarOpen]=useState(()=>lsGet("nagarrafa-sidebar",true));
+  useEffect(()=>{lsSet("nagarrafa-sidebar",sidebarOpen);},[sidebarOpen]);
+
+  const TAB_DEFS=[
+    {idx:0, icon:"🧂", label:"Insumos"},
+    {idx:1, icon:"📥", label:"Compras"},
+    {idx:2, icon:"📦", label:"Estoque"},
+    {idx:3, icon:"📋", label:"Fichas Técnicas"},
+    {idx:4, icon:"💰", label:"Preços"},
+    {idx:5, icon:"🏭", label:"Produção"},
+    {idx:6, icon:"📝", label:"Pedidos"},
+    {idx:7, icon:"🛒", label:"Vendas"},
+    {idx:8, icon:"🏢", label:"Despesas"},
+    {idx:9, icon:"📊", label:"DRE"},
+    {idx:10,icon:"🎯", label:"Dashboard"},
+    {idx:11,icon:"👥", label:"Usuários"},
+    {idx:12,icon:"🛍️", label:"Lista de Compras"},
+    {idx:13,icon:"👤", label:"Clientes"},
+  ];
+
   const ALL_TABS=["🧂 Insumos","📥 Compras","📦 Estoque","📋 Fichas","💰 Preços","🏭 Produção","📝 Pedidos","🛒 Vendas","🏢 Despesas","📊 DRE","🎯 Dashboard","👥 Usuários","🛍️ Lista de Compras","👤 Clientes"];
   const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length,null,null];
 
   if(!currentUser)return <LoginScreen usuarios={usuarios} onLogin={u=>{setCurrentUser(u);setTab(PERMS[u.role].tabs[0]);}}/>;
 
   const role=currentUser.role,perm=PERMS[role];
-  const visibleTabs=ALL_TABS.map((t,i)=>({label:t,idx:i,badge:ALL_BADGES[i]})).filter(t=>canTab(role,t.idx));
+  const visibleTabs=TAB_DEFS.filter(t=>canTab(role,t.idx));
+  const SW=sidebarOpen?224:64;
+  const activeTab=TAB_DEFS.find(t=>t.idx===tab);
 
   return(
-    <div style={{fontFamily:"system-ui,-apple-system,sans-serif",minHeight:"100vh",background:"var(--bg)"}}>
-      <div style={{background:"linear-gradient(135deg,#5b21b6,#3730a3)",color:"white",padding:"14px 24px",boxShadow:"0 4px 20px rgba(0,0,0,.25)"}}>
-        <div style={{maxWidth:1300,margin:"0 auto",display:"flex",alignItems:"center",gap:12}}>
-          <span style={{fontSize:34}}>🫐</span>
-          <div><h1 style={{margin:0,fontSize:22,fontWeight:800,letterSpacing:"-0.5px"}}>NaGarrafa</h1><p style={{margin:0,fontSize:11,opacity:.6}}>Estoque · Custo Médio · Produção · DRE</p></div>
-          <div style={{marginLeft:"auto",display:"flex",gap:12,alignItems:"center"}}>
-            <div style={{fontSize:13,opacity:.85,display:"flex",gap:16}}>
-              <span>Receita: <strong>{fR(recBruta)}</strong></span>
-              <span style={{color:lucOp>=0?"#86efac":"#fca5a5"}}>Resultado: <strong>{fR(lucOp)}</strong></span>
+    <div style={{fontFamily:"system-ui,-apple-system,sans-serif",minHeight:"100vh",background:"var(--bg)",display:"flex"}}>
+
+      {/* ── SIDEBAR ── */}
+      <div style={{
+        position:"fixed",left:0,top:0,height:"100vh",
+        width:SW,
+        background:"linear-gradient(180deg,#3b0f8e 0%,#2d0a6e 60%,#1a0645 100%)",
+        transition:"width .22s cubic-bezier(.4,0,.2,1)",
+        overflowX:"hidden",overflowY:"auto",
+        zIndex:200,
+        display:"flex",flexDirection:"column",
+        boxShadow:"3px 0 20px rgba(0,0,0,.35)",
+      }}>
+        {/* Logo + toggle */}
+        <div style={{
+          display:"flex",alignItems:"center",
+          padding:sidebarOpen?"18px 16px 18px 18px":"18px 0",
+          justifyContent:sidebarOpen?"space-between":"center",
+          borderBottom:"1px solid rgba(255,255,255,.08)",
+          minHeight:72,flexShrink:0,
+        }}>
+          {sidebarOpen&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,overflow:"hidden"}}>
+              <span style={{fontSize:28,filter:"drop-shadow(0 0 10px rgba(167,139,250,.7))",flexShrink:0}}>🫐</span>
+              <div style={{overflow:"hidden"}}>
+                <p style={{margin:0,fontSize:16,fontWeight:800,color:"#fff",letterSpacing:"-0.5px",whiteSpace:"nowrap"}}>NaGarrafa</p>
+                <p style={{margin:0,fontSize:10,color:"rgba(255,255,255,.4)",whiteSpace:"nowrap"}}>Sistema de Gestão</p>
+              </div>
             </div>
-            <button onClick={()=>setDark(d=>!d)} title={dark?"Modo claro":"Modo escuro"} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.2)",color:"white",cursor:"pointer",borderRadius:20,padding:"6px 12px",fontSize:18,display:"flex",alignItems:"center",gap:6}}>
-              {dark?"☀️":"🌙"}<span style={{fontSize:12,fontWeight:500}}>{dark?"Claro":"Escuro"}</span>
-            </button>
-            <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,.15)",borderRadius:20,padding:"6px 14px",border:"1px solid rgba(255,255,255,.15)"}}>
-              <span style={{fontSize:13,fontWeight:600}}>👤 {currentUser.nome}</span>
-              <Pill label={role} color={ROLE_COLORS[role].color} bg={ROLE_COLORS[role].bg}/>
-              <button onClick={()=>setCurrentUser(null)} style={{background:"rgba(255,255,255,.2)",border:"none",color:"white",cursor:"pointer",borderRadius:6,padding:"3px 8px",fontSize:12}}>Sair</button>
-            </div>
+          )}
+          {!sidebarOpen&&<span style={{fontSize:24,filter:"drop-shadow(0 0 8px rgba(167,139,250,.6))"}}>🫐</span>}
+          <button
+            onClick={()=>setSidebarOpen(o=>!o)}
+            title={sidebarOpen?"Recolher menu":"Expandir menu"}
+            style={{
+              background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",
+              color:"white",cursor:"pointer",borderRadius:8,
+              width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:14,flexShrink:0,
+              ...(sidebarOpen?{}:{marginTop:0}),
+            }}
+          >
+            {sidebarOpen?"◀":"▶"}
+          </button>
+        </div>
+
+        {/* Nav items */}
+        <nav style={{flex:1,padding:"10px 0",overflowY:"auto",overflowX:"hidden"}}>
+          {visibleTabs.map(t=>{
+            const isAct=tab===t.idx;
+            const badge=ALL_BADGES[t.idx];
+            return(
+              <button
+                key={t.idx}
+                onClick={()=>setTab(t.idx)}
+                title={!sidebarOpen?t.label:undefined}
+                style={{
+                  display:"flex",alignItems:"center",
+                  gap:sidebarOpen?12:0,
+                  justifyContent:sidebarOpen?"flex-start":"center",
+                  width:"100%",border:"none",cursor:"pointer",
+                  padding:sidebarOpen?"10px 18px":"10px 0",
+                  background:isAct?"rgba(167,139,250,.2)":"transparent",
+                  borderLeft:isAct?"3px solid #a78bfa":"3px solid transparent",
+                  borderRight:"none",
+                  transition:"background .15s,border-color .15s",
+                  position:"relative",
+                  textAlign:"left",
+                }}
+                onMouseEnter={e=>{ if(!isAct)e.currentTarget.style.background="rgba(255,255,255,.07)"; }}
+                onMouseLeave={e=>{ if(!isAct)e.currentTarget.style.background="transparent"; }}
+              >
+                {/* Icon */}
+                <span style={{
+                  fontSize:18,flexShrink:0,lineHeight:1,
+                  filter:isAct?"drop-shadow(0 0 6px rgba(167,139,250,.8))":"none",
+                  position:"relative",
+                }}>
+                  {t.icon}
+                  {/* Badge no ícone quando colapsado */}
+                  {!sidebarOpen&&badge>0&&(
+                    <span style={{
+                      position:"absolute",top:-5,right:-6,
+                      background:"#a78bfa",color:"white",
+                      fontSize:9,fontWeight:800,
+                      padding:"1px 4px",borderRadius:10,
+                      lineHeight:1.4,
+                    }}>{badge>99?"99+":badge}</span>
+                  )}
+                </span>
+
+                {/* Label + badge (apenas quando expandido) */}
+                {sidebarOpen&&(
+                  <>
+                    <span style={{
+                      fontSize:13,fontWeight:isAct?700:400,
+                      color:isAct?"#e9d5ff":"rgba(255,255,255,.75)",
+                      whiteSpace:"nowrap",overflow:"hidden",
+                      flex:1,
+                      transition:"color .15s",
+                    }}>{t.label}</span>
+                    {badge>0&&(
+                      <span style={{
+                        background:isAct?"#a78bfa":"rgba(167,139,250,.35)",
+                        color:"white",fontSize:11,fontWeight:700,
+                        padding:"1px 7px",borderRadius:20,flexShrink:0,
+                      }}>{badge}</span>
+                    )}
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Footer: info do usuário */}
+        <div style={{
+          borderTop:"1px solid rgba(255,255,255,.08)",
+          padding:sidebarOpen?"14px 16px":"12px 0",
+          flexShrink:0,
+          display:"flex",flexDirection:"column",gap:8,
+          alignItems:sidebarOpen?"stretch":"center",
+        }}>
+          {sidebarOpen?(
+            <>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#7c3aed,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"white",fontWeight:700,flexShrink:0}}>
+                  {currentUser.nome[0].toUpperCase()}
+                </div>
+                <div style={{overflow:"hidden",flex:1}}>
+                  <p style={{margin:0,fontSize:13,fontWeight:600,color:"white",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser.nome}</p>
+                  <Pill label={role} color={ROLE_COLORS[role].color} bg={ROLE_COLORS[role].bg}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>setDark(d=>!d)} style={{flex:1,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,padding:"6px 8px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                  {dark?"☀️ Claro":"🌙 Escuro"}
+                </button>
+                <button onClick={()=>setCurrentUser(null)} style={{flex:1,background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",color:"#fca5a5",cursor:"pointer",borderRadius:8,padding:"6px 8px",fontSize:13}}>
+                  Sair
+                </button>
+              </div>
+            </>
+          ):(
+            <>
+              <button onClick={()=>setDark(d=>!d)} title={dark?"Modo claro":"Modo escuro"} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
+                {dark?"☀️":"🌙"}
+              </button>
+              <button onClick={()=>setCurrentUser(null)} title="Sair" style={{background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",color:"#fca5a5",cursor:"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
+                🚪
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── ÁREA PRINCIPAL ── */}
+      <div style={{marginLeft:SW,transition:"margin-left .22s cubic-bezier(.4,0,.2,1)",flex:1,minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+
+        {/* Topbar */}
+        <div style={{
+          background:"linear-gradient(135deg,#5b21b6,#3730a3)",
+          color:"white",padding:"12px 24px",
+          boxShadow:"0 2px 12px rgba(0,0,0,.2)",
+          display:"flex",alignItems:"center",gap:16,
+          position:"sticky",top:0,zIndex:100,
+        }}>
+          <div>
+            <h2 style={{margin:0,fontSize:16,fontWeight:700,color:"#e9d5ff"}}>
+              {activeTab?.icon} {activeTab?.label}
+            </h2>
+          </div>
+          <div style={{marginLeft:"auto",display:"flex",gap:20,alignItems:"center"}}>
+            <span style={{fontSize:13,opacity:.9}}>Receita: <strong>{fR(recBruta)}</strong></span>
+            <span style={{fontSize:13,color:lucOp>=0?"#86efac":"#fca5a5"}}>Resultado: <strong>{fR(lucOp)}</strong></span>
           </div>
         </div>
-      </div>
-      <div style={{background:"var(--tab-bg)",borderBottom:"1px solid var(--tab-border)",overflowX:"auto"}}>
-        <div style={{maxWidth:1300,margin:"0 auto",display:"flex"}}>
-          {visibleTabs.map(t=>(
-            <button key={t.idx} onClick={()=>setTab(t.idx)} style={{padding:"12px 12px",fontSize:13,fontWeight:500,border:"none",background:"transparent",cursor:"pointer",whiteSpace:"nowrap",borderBottom:tab===t.idx?"2px solid #7c3aed":"2px solid transparent",color:tab===t.idx?"#7c3aed":"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
-              {t.label}{t.badge>0&&<span style={{fontSize:11,background:tab===t.idx?"#7c3aed":"var(--accent-soft)",color:tab===t.idx?"white":"#7c3aed",padding:"1px 6px",borderRadius:10,fontWeight:700}}>{t.badge}</span>}
-            </button>
-          ))}
+
+        {/* Conteúdo */}
+        <div style={{flex:1,padding:"24px 24px 48px"}}>
+          {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
+          {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef}/>}
+          {tab===2  && <EstoqueTab idefComCusto={idefComCusto}/>}
+          {tab===3  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn}/>}
+          {tab===4  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
+          {tab===5  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
+          {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido} idef={idef} custMedioFn={custMedioFn}/>}
+          {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} estoqueProdutoFn={estoqueProdutoFn} idef={idef} custMedioFn={custMedioFn}/>}
+          {tab===8  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
+          {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
+          {tab===10 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
+          {tab===11 && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} currentUser={currentUser}/>}
+          {tab===12 && <ListaComprasTab fichasCalc={fichasCalc} idef={idef} setIdef={setIdef} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
+          {tab===13 && <ClientesTab pedidos={pedidos} fichasCalc={fichasCalc} getPreco={getPreco}/>}
         </div>
-      </div>
-      <div style={{maxWidth:1300,margin:"0 auto",padding:"20px 20px 40px"}}>
-        {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
-        {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef}/>}
-        {tab===2  && <EstoqueTab idefComCusto={idefComCusto}/>}
-        {tab===3  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn}/>}
-        {tab===4  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
-        {tab===5  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
-        {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido} idef={idef} custMedioFn={custMedioFn}/>}
-        {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} estoqueProdutoFn={estoqueProdutoFn} idef={idef} custMedioFn={custMedioFn}/>}
-        {tab===8  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
-        {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
-        {tab===10 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
-        {tab===11 && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} currentUser={currentUser}/>}
-        {tab===12 && <ListaComprasTab fichasCalc={fichasCalc} idef={idef} setIdef={setIdef} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
-        {tab===13 && <ClientesTab pedidos={pedidos} fichasCalc={fichasCalc} getPreco={getPreco}/>}
       </div>
     </div>
   );
