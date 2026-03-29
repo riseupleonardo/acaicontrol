@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -360,9 +360,11 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <span style={{fontSize:13,background:"var(--card2)",border:"1px solid var(--border)",padding:"5px 12px",borderRadius:8,color:"var(--text3)"}}>
-                🏪 {h.fornecedor||<em>sem fornecedor</em>}
+                🏪 {h.fornecedor||"sem fornecedor"}
               </span>
-              {(()=>{const pc=PAG_CORES[h.pagamento];return<span style={{fontSize:13,background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"5px 12px",borderRadius:8,fontWeight:600}}>💳 {h.pagamento}</span>;}())}
+              <span style={{fontSize:13,background:PAG_CORES[h.pagamento]?.bg||"var(--card2)",color:PAG_CORES[h.pagamento]?.c||"var(--text3)",padding:"5px 12px",borderRadius:8,fontWeight:600}}>
+                💳 {h.pagamento}
+              </span>
               <span style={{fontSize:13,color:"var(--text3)",background:"var(--card2)",border:"1px solid var(--border)",padding:"5px 12px",borderRadius:8}}>
                 📦 {carrinho.length} item{carrinho.length!==1?"s":""}
               </span>
@@ -373,7 +375,7 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
                 style={{...S.btn,opacity:prontoPraSalvar?1:.45,cursor:prontoPraSalvar?"pointer":"not-allowed"}}
                 onClick={salvarCompra} disabled={!prontoPraSalvar}
               >
-                ✓ Salvar Compra {prontoPraSalvar?`— ${fR(totalCarrinho)}`:""}
+                {prontoPraSalvar?"✓ Salvar Compra — "+fR(totalCarrinho):"✓ Salvar Compra"}
               </button>
             </div>
           </div>
@@ -397,8 +399,8 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
             const isOpen=expanded[c.id];
             const pc=PAG_CORES[c.pagamento];
             return(
-              <>
-                <tr key={c.id} style={{background:isOpen?"rgba(124,58,237,.04)":"transparent",cursor:"pointer"}} onClick={()=>setExpanded(ex=>({...ex,[c.id]:!ex[c.id]}))}>
+              <Fragment key={c.id}>
+                <tr style={{background:isOpen?"rgba(124,58,237,.04)":"transparent",cursor:"pointer"}} onClick={()=>setExpanded(ex=>({...ex,[c.id]:!ex[c.id]}))}>
                   <td style={{...S.td,fontWeight:700,whiteSpace:"nowrap"}}>{c.data||"—"}</td>
                   <td style={{...S.td,fontWeight:600,color:"#3730a3"}}>{c.fornecedor}</td>
                   <td style={S.td}>
@@ -416,7 +418,7 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
                   </td>
                 </tr>
                 {isOpen&&(
-                  <tr key={c.id+"-detail"}>
+                  <tr>
                     <td colSpan={6} style={{padding:0,borderBottom:"1px solid var(--border3)"}}>
                       <div style={{background:"rgba(124,58,237,.04)",borderLeft:"3px solid #a78bfa",padding:"10px 20px"}}>
                         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
@@ -442,7 +444,7 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>
