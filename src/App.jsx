@@ -24,6 +24,10 @@ const cvt = (qty,from,to) => { if(from===to)return qty; const f=FACTORS[from],t=
 const compatUnits = base => COMPAT[base]||[base];
 // Normaliza pedidos/vendas antigos (fichaId/qtd) e novos (items:[])
 const getItems = r => (r.items&&r.items.length) ? r.items : (r.fichaId ? [{fichaId:r.fichaId,qtd:r.qtd,id:r.id}] : []);
+// Normaliza entradas antigas (item direto) e novas (compra com items:[])
+const flatEntradas = ents => ents.flatMap(e=>
+  e.items ? e.items.map(it=>({...it,data:e.data,pagamento:e.pagamento,compraId:e.id})) : [e]
+);
 
 const ROLES = {Admin:"Admin",Comprador:"Comprador",Vendedor:"Vendedor"};
 const ROLE_COLORS = {Admin:{bg:"#ede9fe",color:"#5b21b6"},Comprador:{bg:"#dbeafe",color:"#1e40af"},Vendedor:{bg:"#dcfce7",color:"#166534"}};
@@ -202,124 +206,243 @@ function InsumosDefTab({idef,setIdef}){
   </>);
 }
 
-function ComprasTab({entradas,setEntradas,idef}){
+function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
   const today=new Date().toISOString().slice(0,10);
-  const blank={insumoId:"",numEmb:"",precoUnit:"",data:today,pagamento:"Pix RiseUp"};
-  const [f,setF]=useState(blank);
+  // Cabeçalho da compra
+  const blankH={data:today,pagamento:"Pix RiseUp",fornecedor:""};
+  // Item do carrinho
+  const blankItem={insumoId:"",numEmb:"",precoUnit:""};
+  const [h,setH]=useState(blankH);
+  const [nItem,setNItem]=useState(blankItem);
+  const [carrinho,setCarrinho]=useState([]);
+  const [expanded,setExpanded]=useState({});
 
-  const ins=idef.find(i=>i.id===f.insumoId);
+  const ins=idef.find(i=>i.id===nItem.insumoId);
   const cap=ins?.capacidadeUnitaria;
-  const qtdTotal = cap&&+f.numEmb>0 ? +f.numEmb*+cap : +f.numEmb||0;
-  const custoTotal = +f.numEmb>0&&+f.precoUnit>0 ? +f.numEmb*(+f.precoUnit) : 0;
-  const custoUnitBase = qtdTotal>0&&custoTotal>0 ? custoTotal/qtdTotal : null;
+  const qtdItem=cap&&+nItem.numEmb>0?+nItem.numEmb*+cap:+nItem.numEmb||0;
+  const custoItem=+nItem.numEmb>0&&+nItem.precoUnit>0?+nItem.numEmb*(+nItem.precoUnit):0;
 
-  function cmAtual(iid){const es=entradas.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
-  function novoCM(){const es=entradas.filter(e=>e.insumoId===f.insumoId);const tQ=es.reduce((s,e)=>s+e.qtd,0)+qtdTotal,tC=es.reduce((s,e)=>s+e.custoTotal,0)+custoTotal;return tQ>0?tC/tQ:0;}
+  // Normaliza todas as entradas para cálculo de CM (usa flatEntradas global)
+  const flatEnt=flatEntradas(entradas);
+  function cmAtual(iid){const es=flatEnt.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
 
-  function salvar(){
-    if(!f.insumoId)return alert("Selecione o insumo.");
-    if(!f.numEmb||+f.numEmb<=0)return alert("Informe a quantidade de unidades/embalagens compradas.");
-    if(!f.precoUnit||+f.precoUnit<=0)return alert("Informe o preço unitário.");
-    setEntradas([...entradas,{
-      id:uid(),insumoId:f.insumoId,
-      qtd:+qtdTotal.toFixed(6),
-      custoTotal:+custoTotal.toFixed(4),
-      data:f.data,
-      pagamento:f.pagamento,
-      numEmb:+f.numEmb,
-      precoUnit:+f.precoUnit,
-      capUsada:cap||null,
-    }]);
-    setF({...blank,data:f.data,pagamento:f.pagamento});
+  function addItem(){
+    if(!nItem.insumoId)return alert("Selecione o insumo.");
+    if(!nItem.numEmb||+nItem.numEmb<=0)return alert("Informe a quantidade.");
+    if(!nItem.precoUnit||+nItem.precoUnit<=0)return alert("Informe o preço.");
+    const qtd=+qtdItem.toFixed(6);
+    const custo=+custoItem.toFixed(4);
+    const ex=carrinho.find(i=>i.insumoId===nItem.insumoId);
+    if(ex){
+      setCarrinho(carrinho.map(i=>i.insumoId===nItem.insumoId
+        ?{...i,numEmb:i.numEmb+(+nItem.numEmb),qtd:i.qtd+qtd,custoTotal:i.custoTotal+custo}:i));
+    } else {
+      setCarrinho([...carrinho,{
+        id:uid(),insumoId:nItem.insumoId,
+        numEmb:+nItem.numEmb,precoUnit:+nItem.precoUnit,
+        capUsada:cap||null,qtd,custoTotal:custo,
+      }]);
+    }
+    setNItem(blankItem);
   }
 
-  const cmAtu=f.insumoId?cmAtual(f.insumoId):0;
-  const pronto=f.insumoId&&+f.numEmb>0&&+f.precoUnit>0;
+  function removerItem(id){setCarrinho(carrinho.filter(i=>i.id!==id));}
+
+  function salvarCompra(){
+    if(!h.fornecedor.trim())return alert("Informe o fornecedor/estabelecimento.");
+    if(!carrinho.length)return alert("Adicione ao menos um item à compra.");
+    const totalCompra=carrinho.reduce((s,i)=>s+i.custoTotal,0);
+    setEntradas([...entradas,{
+      id:uid(),data:h.data,pagamento:h.pagamento,fornecedor:h.fornecedor.trim(),
+      items:carrinho,totalCompra:+totalCompra.toFixed(4),
+    }]);
+    setCarrinho([]);
+    setH({...blankH,data:h.data,pagamento:h.pagamento});
+  }
+
+  // Normaliza histórico: novas compras (items[]) e antigas (item direto)
+  const comprasHist=[...entradas].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(e=>{
+    if(e.items){
+      return{id:e.id,data:e.data,pagamento:e.pagamento,fornecedor:e.fornecedor||"—",
+        items:e.items,total:e.totalCompra||e.items.reduce((s,i)=>s+i.custoTotal,0)};
+    }
+    // Compatibilidade: entrada antiga = 1 item
+    const i2=idef.find(i=>i.id===e.insumoId);
+    return{id:e.id,data:e.data,pagamento:e.pagamento||"—",fornecedor:"—",
+      items:[{...e,nome:i2?.nome}],total:e.custoTotal};
+  });
+
+  const totalCarrinho=carrinho.reduce((s,i)=>s+i.custoTotal,0);
+  const prontoPraAdicionar=nItem.insumoId&&+nItem.numEmb>0&&+nItem.precoUnit>0;
+  const prontoPraSalvar=carrinho.length>0&&h.fornecedor.trim();
 
   return(<>
     {!idef.length&&<div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:14,marginBottom:16,color:"#92400e",fontSize:13}}>⚠️ Cadastre insumos antes de registrar compras.</div>}
 
-    <Card title="📥 Registrar Compra">
-      <p style={{margin:"0 0 14px",fontSize:13,color:"var(--text3)"}}>
-        Informe a <strong>quantidade de embalagens</strong> compradas e o <strong>preço por embalagem</strong>. Se o insumo tiver capacidade unitária cadastrada, o sistema converte automaticamente para a unidade base.
-      </p>
-
-      <G cols="3fr 1fr 1fr" gap={10} mb={10}>
-        <div>
-          <Lbl s="Insumo *"/>
-          <select style={S.inp} value={f.insumoId} onChange={e=>setF({...blank,data:f.data,pagamento:f.pagamento,insumoId:e.target.value})}>
-            <option value="">Selecione...</option>
-            {idef.map(i=>{
-              const c=cmAtual(i.id);
-              const capInfo=i.capacidadeUnitaria?` · emb. ${i.capacidadeUnitaria} ${i.unidade}`:"";
-              return<option key={i.id} value={i.id}>{i.nome} ({i.unidade}){capInfo}{c>0?" — CM: "+fR(c):""}</option>;
-            })}
-          </select>
-        </div>
-        <div><Lbl s="Data"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
-        <div>
-          <Lbl s="💳 Meio de pagamento"/>
-          <select style={S.inp} value={f.pagamento} onChange={e=>setF({...f,pagamento:e.target.value})}>
-            {PAGAMENTOS_SAIDA.map(p=><option key={p}>{p}</option>)}
-          </select>
-        </div>
+    <Card title="📥 Nova Compra">
+      {/* ── Cabeçalho: data, fornecedor, pagamento ── */}
+      <G cols="1fr 2fr 1fr" gap={10} mb={12}>
+        <div><Lbl s="📅 Data da compra"/><input style={S.inp} type="date" value={h.data} onChange={e=>setH({...h,data:e.target.value})}/></div>
+        <div><Lbl s="🏪 Fornecedor / Estabelecimento *"/><input style={S.inp} placeholder="Ex: Mercadão, Açaí do Norte..." value={h.fornecedor} onChange={e=>setH({...h,fornecedor:e.target.value})}/></div>
+        <div><Lbl s="💳 Meio de pagamento"/><select style={S.inp} value={h.pagamento} onChange={e=>setH({...h,pagamento:e.target.value})}>{PAGAMENTOS_SAIDA.map(p=><option key={p}>{p}</option>)}</select></div>
       </G>
 
-      {f.insumoId&&(
-        <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:12}}>
-          <G cols="1fr 1fr auto" gap={10} mb={0}>
-            <div>
-              <Lbl s={cap?`Nº de embalagens compradas`:`Quantidade comprada (${ins?.unidade||""})`}/>
-              <input style={S.inp} type="number" step="1" min="1" placeholder={cap?"Ex: 5 embalagens":"Ex: 10"} value={f.numEmb} onChange={e=>setF({...f,numEmb:e.target.value})}/>
-              {cap&&+f.numEmb>0&&(<div style={{marginTop:6,fontSize:12,color:"#7c3aed",background:"var(--accent-soft)",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>{f.numEmb} emb. × {cap} {ins?.unidade} = <strong>{qtdTotal.toFixed(3)} {ins?.unidade}</strong> no estoque</div>)}
-              {!cap&&ins&&(<p style={{margin:"4px 0 0",fontSize:11,color:"#d97706"}}>💡 Defina a capacidade unitária em <strong>🧂 Insumos</strong> para calcular por embalagem.</p>)}
-            </div>
-            <div>
-              <Lbl s={cap?"Preço por embalagem (R$)":"Preço por unidade (R$)"}/>
-              <input style={S.inp} type="number" step="0.01" min="0" placeholder={cap?"Ex: 18,00 / embalagem":"Ex: 5,00 / "+ins?.unidade} value={f.precoUnit} onChange={e=>setF({...f,precoUnit:e.target.value})}/>
-              {cap&&+f.precoUnit>0&&qtdTotal>0&&(<div style={{marginTop:6,fontSize:12,color:"#059669",background:"rgba(5,150,105,.08)",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>{fR(+f.precoUnit)} ÷ {cap} {ins?.unidade} = <strong>{fR(+f.precoUnit/+cap)}/{ins?.unidade}</strong></div>)}
-            </div>
-            <div style={{display:"flex",alignItems:"flex-end"}}>
-              <button style={{...S.btn,opacity:pronto?1:.5,cursor:pronto?"pointer":"not-allowed"}} onClick={salvar} disabled={!pronto}>+ Registrar</button>
-            </div>
-          </G>
-        </div>
-      )}
+      <hr style={{border:"none",borderTop:"1px solid var(--border)",margin:"0 0 14px"}}/>
 
-      {pronto&&ins&&(
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-          {cap&&(<span style={{fontSize:13,color:"#3730a3",background:"rgba(55,48,163,.08)",padding:"6px 14px",borderRadius:8,border:"1px solid rgba(55,48,163,.2)"}}>📦 <strong>{f.numEmb}</strong> emb. de <strong>{cap} {ins.unidade}</strong></span>)}
-          <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"6px 14px",borderRadius:8}}>📊 Total: <strong>{qtdTotal.toFixed(3)} {ins.unidade}</strong></span>
-          <span style={{fontSize:13,color:"#1d4ed8",background:"rgba(29,78,216,.07)",padding:"6px 14px",borderRadius:8}}>💰 Pago: <strong>{fR(custoTotal)}</strong></span>
-          {custoUnitBase!==null&&(<span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"6px 14px",borderRadius:8,fontWeight:600}}>🔖 <strong>{fR(custoUnitBase)}/{ins.unidade}</strong></span>)}
-          {cmAtu>0&&(<span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.08)",padding:"6px 14px",borderRadius:8,border:"1px solid #6ee7b7"}}>📈 Novo CM: <strong>{fR(novoCM())}/{ins.unidade}</strong> <span style={{color:"var(--text4)",fontSize:11}}>(era {fR(cmAtu)})</span></span>)}
-          {(()=>{const pc=PAG_CORES[f.pagamento];return pc&&<span style={{fontSize:13,background:pc.bg,color:pc.c,padding:"6px 14px",borderRadius:8,fontWeight:600}}>💳 {f.pagamento}</span>;})()}
-        </div>
+      {/* ── Adicionar itens ── */}
+      <p style={{margin:"0 0 10px",fontSize:13,fontWeight:700,color:"#7c3aed"}}>🛒 Itens da Compra</p>
+      <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:12}}>
+        <G cols="2.5fr 1fr 1fr auto" gap={8} mb={0}>
+          <div>
+            <Lbl s="Insumo"/>
+            <select style={S.inp} value={nItem.insumoId} onChange={e=>setNItem({...blankItem,insumoId:e.target.value})}>
+              <option value="">Selecione...</option>
+              {idef.map(i=>{
+                const c=cmAtual(i.id);
+                const capInfo=i.capacidadeUnitaria?` · emb. ${i.capacidadeUnitaria} ${i.unidade}`:"";
+                return<option key={i.id} value={i.id}>{i.nome} ({i.unidade}){capInfo}{c>0?" — CM: "+fR(c):""}</option>;
+              })}
+            </select>
+          </div>
+          <div>
+            <Lbl s={cap?"Qtd. embalagens":"Quantidade"}/>
+            <input style={S.inp} type="number" step="1" min="1" placeholder={cap?"Ex: 5":"Ex: 10"}
+              value={nItem.numEmb} onChange={e=>setNItem({...nItem,numEmb:e.target.value})}
+              onKeyDown={e=>e.key==="Enter"&&addItem()}/>
+            {cap&&+nItem.numEmb>0&&<div style={{fontSize:11,color:"#7c3aed",marginTop:3}}>= {qtdItem.toFixed(3)} {ins?.unidade}</div>}
+          </div>
+          <div>
+            <Lbl s={cap?"Preço/embalagem (R$)":"Preço/unidade (R$)"}/>
+            <input style={S.inp} type="number" step="0.01" min="0" placeholder="R$"
+              value={nItem.precoUnit} onChange={e=>setNItem({...nItem,precoUnit:e.target.value})}
+              onKeyDown={e=>e.key==="Enter"&&addItem()}/>
+            {custoItem>0&&<div style={{fontSize:11,color:"#059669",marginTop:3}}>Total: {fR(custoItem)}</div>}
+          </div>
+          <div style={{display:"flex",alignItems:"flex-end"}}>
+            <button style={{...S.btn,opacity:prontoPraAdicionar?1:.45,cursor:prontoPraAdicionar?"pointer":"not-allowed"}} onClick={addItem} disabled={!prontoPraAdicionar}>
+              + Add
+            </button>
+          </div>
+        </G>
+        {!ins&&nItem.insumoId===("")&&<p style={{margin:"8px 0 0",fontSize:12,color:"var(--text4)"}}>Selecione um insumo para adicionar itens à compra.</p>}
+      </div>
+
+      {/* ── Tabela do carrinho ── */}
+      {carrinho.length>0&&(
+        <>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,marginBottom:12}}>
+            <thead><tr>{["Insumo","Emb.","Qtd. total","Preço/emb.","Custo/un","Subtotal",""].map(h2=><th key={h2} style={S.th}>{h2}</th>)}</tr></thead>
+            <tbody>
+              {carrinho.map(item=>{
+                const i2=idef.find(i=>i.id===item.insumoId);
+                const cuUnit=item.qtd>0?item.custoTotal/item.qtd:0;
+                return(
+                  <tr key={item.id}>
+                    <td style={{...S.td,fontWeight:600}}>{i2?.nome||"—"}</td>
+                    <td style={S.td}>{item.capUsada?<span>{item.numEmb} × {item.capUsada} {i2?.unidade}</span>:<span style={{color:"var(--text4)"}}>—</span>}</td>
+                    <td style={S.td}><span style={{fontWeight:700,color:"#059669"}}>{item.qtd.toFixed(3)}</span> <span style={{fontSize:11,color:"var(--text4)"}}>{i2?.unidade}</span></td>
+                    <td style={S.td}>{fR(item.precoUnit)}</td>
+                    <td style={{...S.td,color:"#7c3aed",fontWeight:600}}>{fR(cuUnit)}/{i2?.unidade}</td>
+                    <td style={{...S.td,fontWeight:700,color:"#1d4ed8"}}>{fR(item.custoTotal)}</td>
+                    <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>removerItem(item.id)}>🗑️</button></td>
+                  </tr>
+                );
+              })}
+              <tr style={{background:"rgba(29,78,216,.06)"}}>
+                <td colSpan={5} style={{...S.td,fontWeight:700,textAlign:"right",color:"#1d4ed8"}}>Total da compra:</td>
+                <td style={{...S.td,fontWeight:800,color:"#1d4ed8",fontSize:15}}>{fR(totalCarrinho)}</td>
+                <td style={S.td}/>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Resumo e botão salvar */}
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,background:"var(--card2)",border:"1px solid var(--border)",padding:"5px 12px",borderRadius:8,color:"var(--text3)"}}>
+                🏪 {h.fornecedor||<em>sem fornecedor</em>}
+              </span>
+              {(()=>{const pc=PAG_CORES[h.pagamento];return<span style={{fontSize:13,background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"5px 12px",borderRadius:8,fontWeight:600}}>💳 {h.pagamento}</span>;}())}
+              <span style={{fontSize:13,color:"var(--text3)",background:"var(--card2)",border:"1px solid var(--border)",padding:"5px 12px",borderRadius:8}}>
+                📦 {carrinho.length} item{carrinho.length!==1?"s":""}
+              </span>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button style={S.btn2} onClick={()=>setCarrinho([])}>🗑️ Limpar</button>
+              <button
+                style={{...S.btn,opacity:prontoPraSalvar?1:.45,cursor:prontoPraSalvar?"pointer":"not-allowed"}}
+                onClick={salvarCompra} disabled={!prontoPraSalvar}
+              >
+                ✓ Salvar Compra {prontoPraSalvar?`— ${fR(totalCarrinho)}`:""}
+              </button>
+            </div>
+          </div>
+          {!h.fornecedor.trim()&&<p style={{margin:"8px 0 0",fontSize:12,color:"#ef4444"}}>⚠️ Preencha o fornecedor para salvar.</p>}
+        </>
+      )}
+      {!carrinho.length&&(
+        <p style={{textAlign:"center",color:"var(--text4)",padding:"16px 0",fontSize:13}}>
+          Adicione ao menos um item usando o seletor acima.
+        </p>
       )}
     </Card>
 
-    <Card title={`📋 Histórico de Compras (${entradas.length})`}>
+    {/* ── Histórico agrupado ── */}
+    <Card title={`📋 Histórico de Compras (${comprasHist.length} compra${comprasHist.length!==1?"s":""})`}>
+      {!comprasHist.length&&<p style={{textAlign:"center",color:"var(--text4)",padding:32}}>Nenhuma compra registrada.</p>}
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Data","Insumo","Embalagens","Qtd. total","Preço/emb.","Custo/un","Total pago","💳 Pagamento","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Data","Fornecedor","Itens","Total","💳 Pagamento","Ações"].map(h2=><th key={h2} style={S.th}>{h2}</th>)}</tr></thead>
         <tbody>
-          {!entradas.length&&<tr><td colSpan={9} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhuma compra registrada.</td></tr>}
-          {[...entradas].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(e=>{
-            const i2=idef.find(i=>i.id===e.insumoId);
-            const custUnit=e.qtd>0?e.custoTotal/e.qtd:0;
-            const temEmb=e.numEmb&&e.capUsada;
-            const pc=PAG_CORES[e.pagamento];
+          {comprasHist.map(c=>{
+            const isOpen=expanded[c.id];
+            const pc=PAG_CORES[c.pagamento];
             return(
-              <tr key={e.id}>
-                <td style={S.td}>{e.data||"—"}</td>
-                <td style={{...S.td,fontWeight:600}}>{i2?.nome||"—"}</td>
-                <td style={S.td}>{temEmb?(<div><span style={{fontWeight:700,color:"#3730a3"}}>{e.numEmb}</span><span style={{color:"var(--text4)",fontSize:12,marginLeft:4}}>emb.</span><div style={{fontSize:11,color:"var(--text4)",marginTop:2}}>de {e.capUsada} {i2?.unidade} cada</div></div>):<span style={{color:"var(--text4)",fontSize:12}}>—</span>}</td>
-                <td style={S.td}><span style={{fontWeight:700,color:"#059669"}}>{(+e.qtd).toFixed(3)}</span><span style={{color:"var(--text4)",fontSize:12,marginLeft:4}}>{i2?.unidade}</span></td>
-                <td style={S.td}>{temEmb?<span style={{color:"#1d4ed8",fontWeight:600}}>{fR(e.precoUnit)}</span>:<span style={{color:"var(--text4)",fontSize:12}}>—</span>}</td>
-                <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>{custUnit>0?`${fR(custUnit)}/${i2?.unidade}`:"—"}</td>
-                <td style={{...S.td,fontWeight:600,color:"#1d4ed8"}}>{fR(e.custoTotal)}</td>
-                <td style={S.td}>{e.pagamento?<span style={{background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{e.pagamento}</span>:<span style={{color:"var(--text4)",fontSize:12}}>—</span>}</td>
-                <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>{if(window.confirm("Remover?"))setEntradas(entradas.filter(x=>x.id!==e.id))}}>🗑️</button></td>
-              </tr>
+              <>
+                <tr key={c.id} style={{background:isOpen?"rgba(124,58,237,.04)":"transparent",cursor:"pointer"}} onClick={()=>setExpanded(ex=>({...ex,[c.id]:!ex[c.id]}))}>
+                  <td style={{...S.td,fontWeight:700,whiteSpace:"nowrap"}}>{c.data||"—"}</td>
+                  <td style={{...S.td,fontWeight:600,color:"#3730a3"}}>{c.fornecedor}</td>
+                  <td style={S.td}>
+                    <span style={{background:"var(--accent-soft)",color:"#7c3aed",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:700}}>
+                      {c.items.length} item{c.items.length!==1?"s":""}
+                    </span>
+                  </td>
+                  <td style={{...S.td,fontWeight:800,color:"#1d4ed8",fontSize:15}}>{fR(c.total)}</td>
+                  <td style={S.td}>{c.pagamento&&c.pagamento!=="—"?<span style={{background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{c.pagamento}</span>:<span style={{color:"var(--text4)"}}>—</span>}</td>
+                  <td style={S.td}>
+                    <button style={{...S.bsm,marginRight:4}} onClick={e=>{e.stopPropagation();setExpanded(ex=>({...ex,[c.id]:!ex[c.id]}))}}>
+                      {isOpen?"▲ Recolher":"▼ Detalhar"}
+                    </button>
+                    <button style={{...S.bsm,color:"#ef4444"}} onClick={e=>{e.stopPropagation();if(window.confirm("Remover esta compra?"))setEntradas(entradas.filter(x=>x.id!==c.id))}}>🗑️</button>
+                  </td>
+                </tr>
+                {isOpen&&(
+                  <tr key={c.id+"-detail"}>
+                    <td colSpan={6} style={{padding:0,borderBottom:"1px solid var(--border3)"}}>
+                      <div style={{background:"rgba(124,58,237,.04)",borderLeft:"3px solid #a78bfa",padding:"10px 20px"}}>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                          <thead><tr>{["Insumo","Embalagens","Qtd. total","Preço/emb.","Custo/un","Subtotal"].map(h2=><th key={h2} style={{...S.th,background:"transparent",borderBottom:"1px solid var(--border2)"}}>{h2}</th>)}</tr></thead>
+                          <tbody>
+                            {c.items.map((it,idx)=>{
+                              const i2=idef.find(i=>i.id===it.insumoId);
+                              const cuU=it.qtd>0?it.custoTotal/it.qtd:0;
+                              return(
+                                <tr key={it.id||idx}>
+                                  <td style={{...S.td,fontWeight:600,border:"none"}}>{i2?.nome||it.nome||"—"}</td>
+                                  <td style={{...S.td,border:"none"}}>{it.capUsada?`${it.numEmb||"?"} × ${it.capUsada} ${i2?.unidade}`:"—"}</td>
+                                  <td style={{...S.td,border:"none"}}><span style={{fontWeight:700,color:"#059669"}}>{(+it.qtd||0).toFixed(3)}</span> {i2?.unidade}</td>
+                                  <td style={{...S.td,border:"none"}}>{it.precoUnit?fR(it.precoUnit):"—"}</td>
+                                  <td style={{...S.td,color:"#7c3aed",fontWeight:600,border:"none"}}>{cuU>0?`${fR(cuU)}/${i2?.unidade}`:"—"}</td>
+                                  <td style={{...S.td,fontWeight:700,color:"#1d4ed8",border:"none"}}>{fR(it.custoTotal)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
             );
           })}
         </tbody>
@@ -1725,7 +1848,19 @@ function FluxoCaixaTab({entradas,vendas,fichasCalc,getPreco,idef}){
   const [filtPag,setFiltPag]=useState("Todos");
 
   // Monta lista unificada de movimentos
+  // SAÍDAS: agrupadas por compra (data + fornecedor + total)
   const saidas=entradas.map(e=>{
+    if(e.items){
+      // Nova compra agrupada
+      return{
+        id:e.id,tipo:"saída",data:e.data||"",
+        descricao:`Compra — ${e.fornecedor||"?"}`,
+        detalhe:`${e.items.length} item${e.items.length!==1?"s":""}`,
+        valor:e.totalCompra||e.items.reduce((s,i)=>s+i.custoTotal,0),
+        pagamento:e.pagamento||"—",
+      };
+    }
+    // Entrada antiga (item individual)
     const i2=idef.find(i=>i.id===e.insumoId);
     return{
       id:e.id,tipo:"saída",data:e.data||"",
@@ -1937,15 +2072,16 @@ export default function App(){
   useEffect(()=>{lsSet("ac4_ped",  pedidos);},[pedidos]);
   useEffect(()=>{lsSet("ac4_ven",  vendas);},[vendas]);
 
-  function custMedioFn(iid){const es=entradas.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
-  function estoqueInsumoFn(iid){const ins=idef.find(i=>i.id===iid);if(!ins)return 0;const tE=entradas.filter(e=>e.insumoId===iid).reduce((s,e)=>s+e.qtd,0);const tC=producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0);return tE-tC;}
+  const flatEnt=flatEntradas(entradas);
+  function custMedioFn(iid){const es=flatEnt.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
+  function estoqueInsumoFn(iid){const ins=idef.find(i=>i.id===iid);if(!ins)return 0;const tE=flatEnt.filter(e=>e.insumoId===iid).reduce((s,e)=>s+e.qtd,0);const tC=producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0);return tE-tC;}
   function estoqueProdutoFn(fichaId){
     const p=producoes.filter(p=>p.fichaId===fichaId).reduce((s,p)=>s+p.qtdProduzida,0);
     const v=vendas.reduce((s,v)=>s+getItems(v).filter(i=>i.fichaId===fichaId).reduce((ss,i)=>ss+i.qtd,0),0);
     return p-v;
   }
 
-  const idefComCusto=idef.map(ins=>({...ins,custMedio:custMedioFn(ins.id),estoque:estoqueInsumoFn(ins.id),totalEntradas:entradas.filter(e=>e.insumoId===ins.id).reduce((s,e)=>s+e.qtd,0),totalConsumido:producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===ins.id);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0)}));
+  const idefComCusto=idef.map(ins=>({...ins,custMedio:custMedioFn(ins.id),estoque:estoqueInsumoFn(ins.id),totalEntradas:flatEnt.filter(e=>e.insumoId===ins.id).reduce((s,e)=>s+e.qtd,0),totalConsumido:producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===ins.id);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0)}));
   const fichasCalc=fichas.map(f=>({...f,custo:(f.ings||[]).reduce((s,ing)=>{const ins=idef.find(i=>i.id===ing.iid);if(!ins)return s;return s+custMedioFn(ing.iid)*cvt(ing.qtd,ing.un||ins.unidade,ins.unidade);},0)}));
   function getPreco(fid){if(precos[fid]!=null)return precos[fid];const f=fichasCalc.find(p=>p.id===fid),m=+(margens[fid]??40);return f&&m<100?f.custo/(1-m/100):0;}
 
@@ -2166,7 +2302,7 @@ export default function App(){
         {/* Conteúdo */}
         <div style={{flex:1,padding:"24px 24px 48px"}}>
           {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
-          {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef}/>}
+          {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef} custMedioFn={custMedioFn}/>}
           {tab===2  && <EstoqueTab idefComCusto={idefComCusto}/>}
           {tab===3  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn}/>}
           {tab===4  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
