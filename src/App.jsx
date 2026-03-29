@@ -2043,220 +2043,39 @@ function FluxoCaixaTab({entradas,vendas,fichasCalc,getPreco,idef}){
   </>);
 }
 
+
 // ── APP PRINCIPAL ──────────────────────────────────────────────────────────
 const DEFAULT_ADMIN=[{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}];
 
-// ── BANCO DE DADOS — JSONBin.io ──────────────────────────────────────────
-// 1. Acesse https://jsonbin.io e crie uma conta grátis
-// 2. Vá em "API Keys" e copie a Master Key
-// 3. Clique em "Create Bin", cole {} e salve — copie o BIN ID da URL
-// ⚠️  EDITE APENAS ESTAS 2 LINHAS:
-const JSONBIN_KEY    = "$2a$10$wRZj63KqHLGzBNcwYKVICOMssRb7gEk7LOn9rw.cxZG0BfRCBT6J.";
-const JSONBIN_BIN_ID = "69c984c536566621a85cb4dd";
-// ────────────────────────────────────────────────────────────────────────
-
-const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
-
-async function dbLoad(){
-  const res = await fetch(JSONBIN_URL+"/latest",{
-    headers:{
-      "X-Master-Key": JSONBIN_KEY,
-      "X-Bin-Meta":   "false",
-    },
-  });
-  if(res.status===401) throw new Error("Chave inválida (401). Verifique JSONBIN_KEY.");
-  if(res.status===404) throw new Error("Bin não encontrado (404). Verifique JSONBIN_BIN_ID.");
-  if(!res.ok) throw new Error("Erro ao carregar dados: HTTP "+res.status);
-  const json = await res.json();
-  // JSONBin pode retornar {record:{...},metadata:{...}} ou o objeto direto
-  return json?.record ?? json;
-}
-
-async function dbSave(data){
-  const res = await fetch(JSONBIN_URL,{
-    method:"PUT",
-    headers:{
-      "X-Master-Key":  JSONBIN_KEY,
-      "Content-Type":  "application/json",
-      "X-Bin-Versioning": "false",
-    },
-    body: JSON.stringify(data),
-  });
-  if(!res.ok){
-    const txt = await res.text().catch(()=>"");
-    throw new Error("Erro ao salvar: HTTP "+res.status+" — "+txt.slice(0,100));
-  }
-}
-
-const EMPTY_DB = {
-  ac4_usr:  [{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}],
-  ac4_idef: [], ac4_ent: [], ac4_fic: [],
-  ac4_mar:  {}, ac4_pre: {}, ac4_des: [],
-  ac4_prod: [], ac4_ped: [], ac4_ven: [],
-  theme: "light",
-};
-
 export default function App(){
-  const [dark,setDark]=useState(false);
+  const [dark,setDark]=useState(()=>lsGet("nagarrafa-theme","light")==="dark");
   const [currentUser,setCurrentUser]=useState(null);
   const [tab,setTab]=useState(0);
-  const [loaded,setLoaded]=useState(false);
-  const [syncing,setSyncing]=useState(false);
-  const [lastSync,setLastSync]=useState(null);
-  const [dbError,setDbError]=useState("");
-  // Buffer de salvamento — acumula mudanças e grava em lote
-  const pendingRef = useRef(null);
-  const dbRef = useRef(EMPTY_DB); // cópia em memória do banco completo
+  const [sidebarOpen,setSidebarOpen]=useState(()=>lsGet("nagarrafa-sidebar",true));
+  const [usuarios,setUsuarios]  =useState(()=>lsGet("ac4_usr",DEFAULT_ADMIN));
+  const [idef,setIdef]          =useState(()=>lsGet("ac4_idef",[]));
+  const [entradas,setEntradas]  =useState(()=>lsGet("ac4_ent",[]));
+  const [fichas,setFichas]      =useState(()=>lsGet("ac4_fic",[]));
+  const [margens,setMargens]    =useState(()=>lsGet("ac4_mar",{}));
+  const [precos,setPrecos]      =useState(()=>lsGet("ac4_pre",{}));
+  const [despesas,setDespesas]  =useState(()=>lsGet("ac4_des",[]));
+  const [producoes,setProducoes]=useState(()=>lsGet("ac4_prod",[]));
+  const [pedidos,setPedidos]    =useState(()=>lsGet("ac4_ped",[]));
+  const [vendas,setVendas]      =useState(()=>lsGet("ac4_ven",[]));
 
-  const [usuarios,setUsuarios]  =useState(EMPTY_DB.ac4_usr);
-  const [idef,setIdef]          =useState([]);
-  const [entradas,setEntradas]  =useState([]);
-  const [fichas,setFichas]      =useState([]);
-  const [margens,setMargens]    =useState({});
-  const [precos,setPrecos]      =useState({});
-  const [despesas,setDespesas]  =useState([]);
-  const [producoes,setProducoes]=useState([]);
-  const [pedidos,setPedidos]    =useState([]);
-  const [vendas,setVendas]      =useState([]);
-
-  // ── CARREGAMENTO INICIAL ──────────────────────────────────────────────────
-  useEffect(()=>{
-    const isPlaceholder = JSONBIN_KEY.includes("COLE_") || JSONBIN_BIN_ID.includes("COLE_");
-    if(isPlaceholder){
-      setDbError("PLACEHOLDER");
-      setLoaded(true);
-      return;
-    }
-    async function loadAll(){
-      setSyncing(true);
-      try{
-        const data = await dbLoad();
-        const d = {...EMPTY_DB, ...data};
-        dbRef.current = d;
-        setUsuarios(d.ac4_usr); setIdef(d.ac4_idef); setEntradas(d.ac4_ent);
-        setFichas(d.ac4_fic);   setMargens(d.ac4_mar); setPrecos(d.ac4_pre);
-        setDespesas(d.ac4_des); setProducoes(d.ac4_prod); setPedidos(d.ac4_ped);
-        setVendas(d.ac4_ven);   setDark(d.theme==="dark");
-        setLastSync(new Date());
-        setDbError("");
-      }catch(e){
-        setDbError(e.message||"Erro ao conectar. Verifique a Key e o Bin ID.");
-        console.error("loadAll:",e);
-      }finally{
-        setSyncing(false);
-        setLoaded(true);
-      }
-    }
-    loadAll();
-  },[]);
-
-  // ── GRAVAÇÃO DEBOUNCED — salva 1s após última mudança ─────────────────────
-  function scheduleSave(patch){
-    dbRef.current = {...dbRef.current, ...patch};
-    if(pendingRef.current) clearTimeout(pendingRef.current);
-    pendingRef.current = setTimeout(async()=>{
-      try{ await dbSave(dbRef.current); setLastSync(new Date()); }
-      catch(e){ console.warn("Erro ao salvar:",e.message); }
-    },1000);
-  }
-
-  // ── AUTO-SYNC a cada 30s ──────────────────────────────────────────────────
-  useEffect(()=>{
-    if(!loaded||dbError)return;
-    const iv=setInterval(async()=>{
-      if(document.hidden)return;
-      try{
-        const data=await dbLoad();
-        const d={...EMPTY_DB,...data};
-        dbRef.current=d;
-        setUsuarios(d.ac4_usr); setIdef(d.ac4_idef); setEntradas(d.ac4_ent);
-        setFichas(d.ac4_fic);   setMargens(d.ac4_mar); setPrecos(d.ac4_pre);
-        setDespesas(d.ac4_des); setProducoes(d.ac4_prod); setPedidos(d.ac4_ped);
-        setVendas(d.ac4_ven);   setLastSync(new Date());
-      }catch(e){console.warn("Auto-sync erro:",e.message);}
-    },30000);
-    return()=>clearInterval(iv);
-  },[loaded,dbError]);
-
-  // ── SINCRONIZAÇÃO MANUAL ──────────────────────────────────────────────────
-  async function sincronizar(){
-    setSyncing(true);
-    try{
-      const data=await dbLoad();
-      const d={...EMPTY_DB,...data};
-      dbRef.current=d;
-      setUsuarios(d.ac4_usr); setIdef(d.ac4_idef); setEntradas(d.ac4_ent);
-      setFichas(d.ac4_fic);   setMargens(d.ac4_mar); setPrecos(d.ac4_pre);
-      setDespesas(d.ac4_des); setProducoes(d.ac4_prod); setPedidos(d.ac4_ped);
-      setVendas(d.ac4_ven);   setLastSync(new Date()); setDbError("");
-    }catch(e){alert("Erro ao sincronizar: "+e.message);}
-    finally{setSyncing(false);}
-  }
-
-  // ── WATCHERS — cada mudança de estado dispara um save ─────────────────────
   useEffect(()=>{const s=document.createElement("style");s.id="ng-theme";s.textContent=CSS_VARS;document.head.appendChild(s);return()=>s.remove();},[]);
-  useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");if(loaded&&!dbError)scheduleSave({theme:dark?"dark":"light"});},[dark]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_usr:usuarios});},[usuarios]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_idef:idef});},[idef]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_ent:entradas});},[entradas]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_fic:fichas});},[fichas]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_mar:margens});},[margens]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_pre:precos});},[precos]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_des:despesas});},[despesas]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_prod:producoes});},[producoes]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_ped:pedidos});},[pedidos]);
-  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_ven:vendas});},[vendas]);
-
-  // ── TELA DE CARREGAMENTO ──────────────────────────────────────────────────
-  if(!loaded){
-    return(
-      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#020208,#080518)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:20,padding:24}}>
-        <div style={{fontSize:56,filter:"drop-shadow(0 0 20px rgba(124,58,237,.6))"}}>🫐</div>
-        <p style={{color:"white",fontFamily:"system-ui,sans-serif",fontSize:16,fontWeight:600,opacity:.8}}>Conectando ao banco de dados…</p>
-        <div style={{width:180,height:4,background:"rgba(255,255,255,.1)",borderRadius:4,overflow:"hidden"}}>
-          <div style={{width:"60%",height:"100%",background:"linear-gradient(90deg,#7c3aed,#a78bfa)",borderRadius:4,animation:"slide 1.2s ease-in-out infinite"}}/>
-        </div>
-        <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
-      </div>
-    );
-  }
-
-  if(dbError){
-    const isPlaceholder = dbError === "PLACEHOLDER";
-    return(
-      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#020208,#080518)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,padding:32,fontFamily:"system-ui,sans-serif"}}>
-        <div style={{fontSize:48}}>{isPlaceholder?"⚙️":"❌"}</div>
-        <h2 style={{color:"white",margin:0,fontSize:22}}>{isPlaceholder?"Configure o banco de dados":"Erro de conexão"}</h2>
-        <p style={{color:"rgba(255,255,255,.7)",fontSize:14,textAlign:"center",maxWidth:480,lineHeight:1.7,margin:0}}>
-          {isPlaceholder
-            ? "Abra o arquivo App.jsx e substitua as 2 linhas abaixo pelos dados do seu JSONBin:"
-            : "Erro: "+dbError+". Verifique a Master Key e o Bin ID no arquivo App.jsx."}
-        </p>
-        <div style={{background:"rgba(0,0,0,.5)",border:"1px solid rgba(124,58,237,.4)",borderRadius:12,padding:20,maxWidth:540,width:"100%",fontFamily:"monospace",fontSize:13,lineHeight:2}}>
-          {isPlaceholder?(
-            <>
-              <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.4)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Encontre no App.jsx e substitua:</p>
-              <p style={{margin:0,color:"#ef4444"}}>const JSONBIN_KEY = "COLE_SUA_MASTER_KEY_AQUI";</p>
-              <p style={{margin:0,color:"#ef4444"}}>const JSONBIN_BIN_ID = "COLE_O_BIN_ID_AQUI";</p>
-              <div style={{height:1,background:"rgba(255,255,255,.1)",margin:"12px 0"}}/>
-              <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.4)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Como obter:</p>
-              <p style={{margin:0,color:"rgba(255,255,255,.6)",fontFamily:"system-ui",fontSize:12,lineHeight:1.8}}>
-                1. Acesse <span style={{color:"#a78bfa"}}>jsonbin.io</span> → crie conta grátis{"\n"}
-                2. Vá em "API Keys" → copie a <span style={{color:"#a78bfa"}}>Master Key</span>{"\n"}
-                3. Clique em "Create Bin" → cole <span style={{color:"#a78bfa"}}>{"{}"}</span> → salve{"\n"}
-                4. Copie o <span style={{color:"#a78bfa"}}>BIN ID</span> que aparece na URL
-              </p>
-            </>
-          ):(
-            <p style={{margin:0,color:"#fca5a5"}}>Verifique se a Master Key e o Bin ID estão corretos no arquivo App.jsx.</p>
-          )}
-        </div>
-        <button onClick={()=>window.location.reload()} style={{background:"#7c3aed",color:"white",border:"none",borderRadius:8,padding:"10px 28px",fontSize:14,cursor:"pointer",fontWeight:600,marginTop:8}}>
-          🔄 Tentar novamente
-        </button>
-      </div>
-    );
-  }
+  useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");lsSet("nagarrafa-theme",dark?"dark":"light");},[dark]);
+  useEffect(()=>{lsSet("nagarrafa-sidebar",sidebarOpen);},[sidebarOpen]);
+  useEffect(()=>{lsSet("ac4_usr",  usuarios);},[usuarios]);
+  useEffect(()=>{lsSet("ac4_idef", idef);},[idef]);
+  useEffect(()=>{lsSet("ac4_ent",  entradas);},[entradas]);
+  useEffect(()=>{lsSet("ac4_fic",  fichas);},[fichas]);
+  useEffect(()=>{lsSet("ac4_mar",  margens);},[margens]);
+  useEffect(()=>{lsSet("ac4_pre",  precos);},[precos]);
+  useEffect(()=>{lsSet("ac4_des",  despesas);},[despesas]);
+  useEffect(()=>{lsSet("ac4_prod", producoes);},[producoes]);
+  useEffect(()=>{lsSet("ac4_ped",  pedidos);},[pedidos]);
+  useEffect(()=>{lsSet("ac4_ven",  vendas);},[vendas]);
 
   const flatEnt=flatEntradas(entradas);
   function custMedioFn(iid){const es=flatEnt.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
@@ -2266,7 +2085,6 @@ export default function App(){
     const v=vendas.reduce((s,v)=>s+getItems(v).filter(i=>i.fichaId===fichaId).reduce((ss,i)=>ss+i.qtd,0),0);
     return p-v;
   }
-
   const idefComCusto=idef.map(ins=>({...ins,custMedio:custMedioFn(ins.id),estoque:estoqueInsumoFn(ins.id),totalEntradas:flatEnt.filter(e=>e.insumoId===ins.id).reduce((s,e)=>s+e.qtd,0),totalConsumido:producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===ins.id);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0)}));
   const fichasCalc=fichas.map(f=>({...f,custo:(f.ings||[]).reduce((s,ing)=>{const ins=idef.find(i=>i.id===ing.iid);if(!ins)return s;return s+custMedioFn(ing.iid)*cvt(ing.qtd,ing.un||ins.unidade,ins.unidade);},0)}));
   function getPreco(fid){if(precos[fid]!=null)return precos[fid];const f=fichasCalc.find(p=>p.id===fid),m=+(margens[fid]??40);return f&&m<100?f.custo/(1-m/100):0;}
@@ -2274,9 +2092,6 @@ export default function App(){
   const recBruta=vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>ss+i.qtd*getPreco(i.fichaId),0),0);
   const cmv=vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>{const f=fichasCalc.find(p=>p.id===i.fichaId);return ss+(f?i.qtd*f.custo:0);},0),0);
   const lucBruto=recBruta-cmv,totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0),lucOp=lucBruto-totDesp;
-
-  const [sidebarOpen,setSidebarOpen]=useState(()=>lsGet("nagarrafa-sidebar",true));
-  useEffect(()=>{lsSet("nagarrafa-sidebar",sidebarOpen);},[sidebarOpen]);
 
   const TAB_DEFS=[
     {idx:0, icon:"🧂", label:"Insumos"},
@@ -2295,8 +2110,6 @@ export default function App(){
     {idx:13,icon:"👤", label:"Clientes"},
     {idx:14,icon:"💵", label:"Fluxo de Caixa"},
   ];
-
-  const ALL_TABS=["🧂 Insumos","📥 Compras","📦 Estoque","📋 Fichas","💰 Preços","🏭 Produção","📝 Pedidos","🛒 Vendas","🏢 Despesas","📊 DRE","🎯 Dashboard","👥 Usuários","🛍️ Lista de Compras","👤 Clientes"];
   const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length,null,null,null];
 
   if(!currentUser)return <LoginScreen usuarios={usuarios} onLogin={u=>{setCurrentUser(u);setTab(PERMS[u.role].tabs[0]);}}/>;
@@ -2308,26 +2121,10 @@ export default function App(){
 
   return(
     <div style={{fontFamily:"system-ui,-apple-system,sans-serif",minHeight:"100vh",background:"var(--bg)",display:"flex"}}>
-
       {/* ── SIDEBAR ── */}
-      <div style={{
-        position:"fixed",left:0,top:0,height:"100vh",
-        width:SW,
-        background:"linear-gradient(180deg,#3b0f8e 0%,#2d0a6e 60%,#1a0645 100%)",
-        transition:"width .22s cubic-bezier(.4,0,.2,1)",
-        overflowX:"hidden",overflowY:"auto",
-        zIndex:200,
-        display:"flex",flexDirection:"column",
-        boxShadow:"3px 0 20px rgba(0,0,0,.35)",
-      }}>
+      <div style={{position:"fixed",left:0,top:0,height:"100vh",width:SW,background:"linear-gradient(180deg,#3b0f8e 0%,#2d0a6e 60%,#1a0645 100%)",transition:"width .22s cubic-bezier(.4,0,.2,1)",overflowX:"hidden",overflowY:"auto",zIndex:200,display:"flex",flexDirection:"column",boxShadow:"3px 0 20px rgba(0,0,0,.35)"}}>
         {/* Logo + toggle */}
-        <div style={{
-          display:"flex",alignItems:"center",
-          padding:sidebarOpen?"18px 16px 18px 18px":"18px 0",
-          justifyContent:sidebarOpen?"space-between":"center",
-          borderBottom:"1px solid rgba(255,255,255,.08)",
-          minHeight:72,flexShrink:0,
-        }}>
+        <div style={{display:"flex",alignItems:"center",padding:sidebarOpen?"18px 16px":"18px 0",justifyContent:sidebarOpen?"space-between":"center",borderBottom:"1px solid rgba(255,255,255,.08)",minHeight:72,flexShrink:0}}>
           {sidebarOpen&&(
             <div style={{display:"flex",alignItems:"center",gap:10,overflow:"hidden"}}>
               <span style={{fontSize:28,filter:"drop-shadow(0 0 10px rgba(167,139,250,.7))",flexShrink:0}}>🫐</span>
@@ -2338,134 +2135,55 @@ export default function App(){
             </div>
           )}
           {!sidebarOpen&&<span style={{fontSize:24,filter:"drop-shadow(0 0 8px rgba(167,139,250,.6))"}}>🫐</span>}
-          <button
-            onClick={()=>setSidebarOpen(o=>!o)}
-            title={sidebarOpen?"Recolher menu":"Expandir menu"}
-            style={{
-              background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",
-              color:"white",cursor:"pointer",borderRadius:8,
-              width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:14,flexShrink:0,
-              ...(sidebarOpen?{}:{marginTop:0}),
-            }}
-          >
+          <button onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?"Recolher":"Expandir"} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
             {sidebarOpen?"◀":"▶"}
           </button>
         </div>
-
         {/* Nav items */}
         <nav style={{flex:1,padding:"10px 0",overflowY:"auto",overflowX:"hidden"}}>
           {visibleTabs.map(t=>{
             const isAct=tab===t.idx;
             const badge=ALL_BADGES[t.idx];
             return(
-              <button
-                key={t.idx}
-                onClick={()=>setTab(t.idx)}
-                title={!sidebarOpen?t.label:undefined}
-                style={{
-                  display:"flex",alignItems:"center",
-                  gap:sidebarOpen?12:0,
-                  justifyContent:sidebarOpen?"flex-start":"center",
-                  width:"100%",border:"none",cursor:"pointer",
-                  padding:sidebarOpen?"10px 18px":"10px 0",
-                  background:isAct?"rgba(167,139,250,.2)":"transparent",
-                  borderLeft:isAct?"3px solid #a78bfa":"3px solid transparent",
-                  borderRight:"none",
-                  transition:"background .15s,border-color .15s",
-                  position:"relative",
-                  textAlign:"left",
-                }}
-                onMouseEnter={e=>{ if(!isAct)e.currentTarget.style.background="rgba(255,255,255,.07)"; }}
-                onMouseLeave={e=>{ if(!isAct)e.currentTarget.style.background="transparent"; }}
+              <button key={t.idx} onClick={()=>setTab(t.idx)} title={!sidebarOpen?t.label:undefined}
+                style={{display:"flex",alignItems:"center",gap:sidebarOpen?12:0,justifyContent:sidebarOpen?"flex-start":"center",width:"100%",border:"none",cursor:"pointer",padding:sidebarOpen?"10px 18px":"10px 0",background:isAct?"rgba(167,139,250,.2)":"transparent",borderLeft:isAct?"3px solid #a78bfa":"3px solid transparent",borderRight:"none",transition:"background .15s",textAlign:"left"}}
+                onMouseEnter={e=>{if(!isAct)e.currentTarget.style.background="rgba(255,255,255,.07)";}}
+                onMouseLeave={e=>{if(!isAct)e.currentTarget.style.background="transparent";}}
               >
-                {/* Icon */}
-                <span style={{
-                  fontSize:18,flexShrink:0,lineHeight:1,
-                  filter:isAct?"drop-shadow(0 0 6px rgba(167,139,250,.8))":"none",
-                  position:"relative",
-                }}>
+                <span style={{fontSize:18,flexShrink:0,lineHeight:1,filter:isAct?"drop-shadow(0 0 6px rgba(167,139,250,.8))":"none",position:"relative"}}>
                   {t.icon}
-                  {/* Badge no ícone quando colapsado */}
-                  {!sidebarOpen&&badge>0&&(
-                    <span style={{
-                      position:"absolute",top:-5,right:-6,
-                      background:"#a78bfa",color:"white",
-                      fontSize:9,fontWeight:800,
-                      padding:"1px 4px",borderRadius:10,
-                      lineHeight:1.4,
-                    }}>{badge>99?"99+":badge}</span>
-                  )}
+                  {!sidebarOpen&&badge>0&&<span style={{position:"absolute",top:-5,right:-6,background:"#a78bfa",color:"white",fontSize:9,fontWeight:800,padding:"1px 4px",borderRadius:10,lineHeight:1.4}}>{badge>99?"99+":badge}</span>}
                 </span>
-
-                {/* Label + badge (apenas quando expandido) */}
                 {sidebarOpen&&(
                   <>
-                    <span style={{
-                      fontSize:13,fontWeight:isAct?700:400,
-                      color:isAct?"#e9d5ff":"rgba(255,255,255,.75)",
-                      whiteSpace:"nowrap",overflow:"hidden",
-                      flex:1,
-                      transition:"color .15s",
-                    }}>{t.label}</span>
-                    {badge>0&&(
-                      <span style={{
-                        background:isAct?"#a78bfa":"rgba(167,139,250,.35)",
-                        color:"white",fontSize:11,fontWeight:700,
-                        padding:"1px 7px",borderRadius:20,flexShrink:0,
-                      }}>{badge}</span>
-                    )}
+                    <span style={{fontSize:13,fontWeight:isAct?700:400,color:isAct?"#e9d5ff":"rgba(255,255,255,.75)",whiteSpace:"nowrap",overflow:"hidden",flex:1}}>{t.label}</span>
+                    {badge>0&&<span style={{background:isAct?"#a78bfa":"rgba(167,139,250,.35)",color:"white",fontSize:11,fontWeight:700,padding:"1px 7px",borderRadius:20,flexShrink:0}}>{badge}</span>}
                   </>
                 )}
               </button>
             );
           })}
         </nav>
-
-        {/* Footer: info do usuário */}
-        <div style={{
-          borderTop:"1px solid rgba(255,255,255,.08)",
-          padding:sidebarOpen?"14px 16px":"12px 0",
-          flexShrink:0,
-          display:"flex",flexDirection:"column",gap:8,
-          alignItems:sidebarOpen?"stretch":"center",
-        }}>
+        {/* Footer: usuário */}
+        <div style={{borderTop:"1px solid rgba(255,255,255,.08)",padding:sidebarOpen?"14px 16px":"12px 0",flexShrink:0,display:"flex",flexDirection:"column",gap:8,alignItems:sidebarOpen?"stretch":"center"}}>
           {sidebarOpen?(
             <>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#7c3aed,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"white",fontWeight:700,flexShrink:0}}>
-                  {currentUser.nome[0].toUpperCase()}
-                </div>
+                <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#7c3aed,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"white",fontWeight:700,flexShrink:0}}>{currentUser.nome[0].toUpperCase()}</div>
                 <div style={{overflow:"hidden",flex:1}}>
                   <p style={{margin:0,fontSize:13,fontWeight:600,color:"white",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser.nome}</p>
                   <Pill label={role} color={ROLE_COLORS[role].color} bg={ROLE_COLORS[role].bg}/>
                 </div>
               </div>
-              {/* Status de sincronização */}
-              <button onClick={sincronizar} disabled={syncing} style={{width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:syncing?"wait":"pointer",borderRadius:8,padding:"6px 8px",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6,opacity:syncing?.7:1}}>
-                <span style={{fontSize:14}}>{syncing?"⏳":"🔄"}</span>
-                <span>{syncing?"Sincronizando…":lastSync?"Sincronizado "+lastSync.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Sincronizar"}</span>
-              </button>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>setDark(d=>!d)} style={{flex:1,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,padding:"6px 8px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
-                  {dark?"☀️ Claro":"🌙 Escuro"}
-                </button>
-                <button onClick={()=>setCurrentUser(null)} style={{flex:1,background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",color:"#fca5a5",cursor:"pointer",borderRadius:8,padding:"6px 8px",fontSize:13}}>
-                  Sair
-                </button>
+                <button onClick={()=>setDark(d=>!d)} style={{flex:1,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,padding:"6px 8px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>{dark?"☀️ Claro":"🌙 Escuro"}</button>
+                <button onClick={()=>setCurrentUser(null)} style={{flex:1,background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",color:"#fca5a5",cursor:"pointer",borderRadius:8,padding:"6px 8px",fontSize:13}}>Sair</button>
               </div>
             </>
           ):(
             <>
-              <button onClick={sincronizar} disabled={syncing} title={syncing?"Sincronizando…":"Sincronizar dados"} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:syncing?"wait":"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
-                {syncing?"⏳":"🔄"}
-              </button>
-              <button onClick={()=>setDark(d=>!d)} title={dark?"Modo claro":"Modo escuro"} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
-                {dark?"☀️":"🌙"}
-              </button>
-              <button onClick={()=>setCurrentUser(null)} title="Sair" style={{background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",color:"#fca5a5",cursor:"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
-                🚪
-              </button>
+              <button onClick={()=>setDark(d=>!d)} title={dark?"Modo claro":"Modo escuro"} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{dark?"☀️":"🌙"}</button>
+              <button onClick={()=>setCurrentUser(null)} title="Sair" style={{background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",color:"#fca5a5",cursor:"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🚪</button>
             </>
           )}
         </div>
@@ -2473,26 +2191,14 @@ export default function App(){
 
       {/* ── ÁREA PRINCIPAL ── */}
       <div style={{marginLeft:SW,transition:"margin-left .22s cubic-bezier(.4,0,.2,1)",flex:1,minHeight:"100vh",display:"flex",flexDirection:"column"}}>
-
         {/* Topbar */}
-        <div style={{
-          background:"linear-gradient(135deg,#5b21b6,#3730a3)",
-          color:"white",padding:"12px 24px",
-          boxShadow:"0 2px 12px rgba(0,0,0,.2)",
-          display:"flex",alignItems:"center",gap:16,
-          position:"sticky",top:0,zIndex:100,
-        }}>
-          <div>
-            <h2 style={{margin:0,fontSize:16,fontWeight:700,color:"#e9d5ff"}}>
-              {activeTab?.icon} {activeTab?.label}
-            </h2>
-          </div>
+        <div style={{background:"linear-gradient(135deg,#5b21b6,#3730a3)",color:"white",padding:"12px 24px",boxShadow:"0 2px 12px rgba(0,0,0,.2)",display:"flex",alignItems:"center",gap:16,position:"sticky",top:0,zIndex:100}}>
+          <h2 style={{margin:0,fontSize:16,fontWeight:700,color:"#e9d5ff"}}>{activeTab?.icon} {activeTab?.label}</h2>
           <div style={{marginLeft:"auto",display:"flex",gap:20,alignItems:"center"}}>
             <span style={{fontSize:13,opacity:.9}}>Receita: <strong>{fR(recBruta)}</strong></span>
             <span style={{fontSize:13,color:lucOp>=0?"#86efac":"#fca5a5"}}>Resultado: <strong>{fR(lucOp)}</strong></span>
           </div>
         </div>
-
         {/* Conteúdo */}
         <div style={{flex:1,padding:"24px 24px 48px"}}>
           {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
