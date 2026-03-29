@@ -2047,10 +2047,12 @@ function FluxoCaixaTab({entradas,vendas,fichasCalc,getPreco,idef}){
 const DEFAULT_ADMIN=[{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}];
 
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────────
-// Cole aqui as credenciais do seu projeto Supabase
+// ⚠️  EDITE APENAS ESTAS 2 LINHAS com os dados do seu Supabase
 // Painel Supabase → Settings → API
-const SUPABASE_URL = "https:/updjtkbscnhjmfyfxrgv.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwZGp0a2JzY25oam1meWZ4cmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3OTQ5MzgsImV4cCI6MjA5MDM3MDkzOH0.KBSoYXdiEVTVu4lkP07y3S2AbiK_5nMbVBr1D0Vabh8";
+const SUPABASE_URL = "https://updjtkbscnhjmfyfxrgv.supabase.co";   // ex: https://xyzabc.supabase.co
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwZGp0a2JzY25oam1meWZ4cmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3OTQ5MzgsImV4cCI6MjA5MDM3MDkzOH0.KBSoYXdiEVTVu4lkP07y3S2AbiK_5nMbVBr1D0Vabh8";   // ex: eyJhbGciOiJIUzI1NiIs...
+const TABLE        = "nagarrafa_data";
+// ─────────────────────────────────────────────────────────────────────────
 
 // Cliente Supabase mínimo — sem dependência de pacote extra
 async function sbFetch(path, options={}){
@@ -2111,8 +2113,8 @@ export default function App(){
 
   // ── CARREGAMENTO INICIAL ──────────────────────────────────────────────────
   useEffect(()=>{
-    if(!SUPABASE_URL||!SUPABASE_KEY){
-      setDbError("⚠️ Variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY não configuradas.");
+    if(SUPABASE_URL.includes("COLE_SUA_URL") || SUPABASE_KEY.includes("COLE_SUA_KEY")){
+      setDbError("PLACEHOLDER");
       setLoaded(true);
       return;
     }
@@ -2225,17 +2227,30 @@ export default function App(){
   }
 
   if(dbError){
+    const isPlaceholder = dbError === "PLACEHOLDER";
     return(
-      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#020208,#080518)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,padding:32}}>
-        <div style={{fontSize:48}}>⚠️</div>
-        <h2 style={{color:"white",fontFamily:"system-ui,sans-serif",margin:0}}>Erro de configuração</h2>
-        <p style={{color:"rgba(255,255,255,.7)",fontFamily:"system-ui,sans-serif",fontSize:14,textAlign:"center",maxWidth:460,lineHeight:1.6}}>{dbError}</p>
-        <div style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.15)",borderRadius:12,padding:20,maxWidth:460,width:"100%",fontFamily:"monospace",fontSize:13,color:"#a78bfa",lineHeight:1.8}}>
-          <p style={{margin:"0 0 8px",color:"rgba(255,255,255,.5)",fontFamily:"system-ui",fontSize:12}}>Adicione no .env ou nas variáveis do Vercel:</p>
-          <p style={{margin:0}}>VITE_SUPABASE_URL=https://xxxx.supabase.co</p>
-          <p style={{margin:0}}>VITE_SUPABASE_ANON_KEY=eyJhb...</p>
-        </div>
-        <button onClick={()=>window.location.reload()} style={{background:"#7c3aed",color:"white",border:"none",borderRadius:8,padding:"10px 24px",fontSize:14,cursor:"pointer",fontFamily:"system-ui,sans-serif",fontWeight:600}}>
+      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#020208,#080518)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,padding:32,fontFamily:"system-ui,sans-serif"}}>
+        <div style={{fontSize:48}}>{isPlaceholder?"⚙️":"❌"}</div>
+        <h2 style={{color:"white",margin:0,fontSize:22}}>{isPlaceholder?"Configure o banco de dados":"Erro de conexão"}</h2>
+        <p style={{color:"rgba(255,255,255,.7)",fontSize:14,textAlign:"center",maxWidth:480,lineHeight:1.7,margin:0}}>
+          {isPlaceholder
+            ? "Abra o arquivo App.jsx no GitHub e substitua as 2 linhas abaixo pelos dados do seu Supabase:"
+            : dbError}
+        </p>
+        {isPlaceholder&&(
+          <div style={{background:"rgba(0,0,0,.5)",border:"1px solid rgba(124,58,237,.4)",borderRadius:12,padding:20,maxWidth:520,width:"100%",fontFamily:"monospace",fontSize:13,lineHeight:2}}>
+            <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.35)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Procure no App.jsx e substitua:</p>
+            <p style={{margin:0,color:"#ef4444"}}>const SUPABASE_URL = "COLE_SUA_URL_AQUI";</p>
+            <p style={{margin:0,color:"#ef4444"}}>const SUPABASE_KEY = "COLE_SUA_KEY_AQUI";</p>
+            <div style={{height:1,background:"rgba(255,255,255,.1)",margin:"12px 0"}}/>
+            <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.35)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Pelos seus valores reais:</p>
+            <p style={{margin:0,color:"#a78bfa"}}>const SUPABASE_URL = "https://xxxx.supabase.co";</p>
+            <p style={{margin:0,color:"#a78bfa"}}>const SUPABASE_KEY = "eyJhbGci...";</p>
+            <div style={{height:1,background:"rgba(255,255,255,.1)",margin:"12px 0"}}/>
+            <p style={{margin:0,color:"rgba(255,255,255,.4)",fontFamily:"system-ui",fontSize:12}}>📍 Supabase → Settings → API → Project URL + anon/public key</p>
+          </div>
+        )}
+        <button onClick={()=>window.location.reload()} style={{background:"#7c3aed",color:"white",border:"none",borderRadius:8,padding:"10px 28px",fontSize:14,cursor:"pointer",fontWeight:600,marginTop:8}}>
           🔄 Tentar novamente
         </button>
       </div>
