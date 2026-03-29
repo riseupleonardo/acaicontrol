@@ -2046,33 +2046,199 @@ function FluxoCaixaTab({entradas,vendas,fichasCalc,getPreco,idef}){
 // ── APP PRINCIPAL ──────────────────────────────────────────────────────────
 const DEFAULT_ADMIN=[{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}];
 
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────────
+// Substitua pelos valores do seu projeto no painel do Supabase
+// (Settings → API)
+const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || "";
+const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const TABLE         = "nagarrafa_data";
+
+// Cliente Supabase mínimo — sem dependência de pacote extra
+async function sbFetch(path, options={}){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers:{
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation",
+      ...(options.headers||{}),
+    },
+  });
+  if(!res.ok) throw new Error(await res.text());
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+async function dbGet(key, def){
+  try{
+    const rows = await sbFetch(`${TABLE}?key=eq.${key}&select=value`);
+    return rows?.length ? rows[0].value : def;
+  }catch(e){ console.warn("dbGet",key,e); return def; }
+}
+
+async function dbSet(key, val){
+  try{
+    await sbFetch(`${TABLE}`, {
+      method:"POST",
+      headers:{"Prefer":"resolution=merge-duplicates"},
+      body: JSON.stringify({key, value: val, updated_at: new Date().toISOString()}),
+    });
+  }catch(e){ console.warn("dbSet",key,e); }
+}
+
 export default function App(){
-  const [dark,setDark]=useState(()=>lsGet("nagarrafa-theme","light")==="dark");
+  const [dark,setDark]=useState(false);
   const [currentUser,setCurrentUser]=useState(null);
   const [tab,setTab]=useState(0);
-  const [usuarios,setUsuarios]  =useState(()=>lsGet("ac4_usr",DEFAULT_ADMIN));
-  const [idef,setIdef]          =useState(()=>lsGet("ac4_idef",[]));
-  const [entradas,setEntradas]  =useState(()=>lsGet("ac4_ent",[]));
-  const [fichas,setFichas]      =useState(()=>lsGet("ac4_fic",[]));
-  const [margens,setMargens]    =useState(()=>lsGet("ac4_mar",{}));
-  const [precos,setPrecos]      =useState(()=>lsGet("ac4_pre",{}));
-  const [despesas,setDespesas]  =useState(()=>lsGet("ac4_des",[]));
-  const [producoes,setProducoes]=useState(()=>lsGet("ac4_prod",[]));
-  const [pedidos,setPedidos]    =useState(()=>lsGet("ac4_ped",[]));
-  const [vendas,setVendas]      =useState(()=>lsGet("ac4_ven",[]));
+  const [loaded,setLoaded]=useState(false);
+  const [syncing,setSyncing]=useState(false);
+  const [lastSync,setLastSync]=useState(null);
+  const [dbError,setDbError]=useState("");
 
+  const [usuarios,setUsuarios]  =useState(DEFAULT_ADMIN);
+  const [idef,setIdef]          =useState([]);
+  const [entradas,setEntradas]  =useState([]);
+  const [fichas,setFichas]      =useState([]);
+  const [margens,setMargens]    =useState({});
+  const [precos,setPrecos]      =useState({});
+  const [despesas,setDespesas]  =useState([]);
+  const [producoes,setProducoes]=useState([]);
+  const [pedidos,setPedidos]    =useState([]);
+  const [vendas,setVendas]      =useState([]);
+
+  // ── CARREGAMENTO INICIAL ──────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!SUPABASE_URL||!SUPABASE_KEY){
+      setDbError("⚠️ Variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY não configuradas.");
+      setLoaded(true);
+      return;
+    }
+    async function loadAll(){
+      setSyncing(true);
+      try{
+        const [u,id,ent,fic,mar,pre,des,prod,ped,ven,theme]=await Promise.all([
+          dbGet("ac4_usr",DEFAULT_ADMIN),
+          dbGet("ac4_idef",[]),
+          dbGet("ac4_ent",[]),
+          dbGet("ac4_fic",[]),
+          dbGet("ac4_mar",{}),
+          dbGet("ac4_pre",{}),
+          dbGet("ac4_des",[]),
+          dbGet("ac4_prod",[]),
+          dbGet("ac4_ped",[]),
+          dbGet("ac4_ven",[]),
+          dbGet("nagarrafa-theme","light"),
+        ]);
+        setUsuarios(u); setIdef(id); setEntradas(ent); setFichas(fic);
+        setMargens(mar); setPrecos(pre); setDespesas(des); setProducoes(prod);
+        setPedidos(ped); setVendas(ven);
+        setDark(theme==="dark");
+        setLastSync(new Date());
+        setDbError("");
+      }catch(e){
+        setDbError("Erro ao conectar ao banco de dados. Verifique as variáveis de ambiente.");
+        console.error("loadAll:",e);
+      }finally{
+        setSyncing(false);
+        setLoaded(true);
+      }
+    }
+    loadAll();
+  },[]);
+
+  // ── AUTO-SYNC a cada 20s (busca mudanças de outros usuários) ──────────────
+  useEffect(()=>{
+    if(!loaded)return;
+    const iv=setInterval(async()=>{
+      if(document.hidden)return; // não sincroniza se aba estiver em segundo plano
+      try{
+        const[u,id,ent,fic,mar,pre,des,prod,ped,ven]=await Promise.all([
+          dbGet("ac4_usr",DEFAULT_ADMIN),
+          dbGet("ac4_idef",[]),
+          dbGet("ac4_ent",[]),
+          dbGet("ac4_fic",[]),
+          dbGet("ac4_mar",{}),
+          dbGet("ac4_pre",{}),
+          dbGet("ac4_des",[]),
+          dbGet("ac4_prod",[]),
+          dbGet("ac4_ped",[]),
+          dbGet("ac4_ven",[]),
+        ]);
+        setUsuarios(u); setIdef(id); setEntradas(ent); setFichas(fic);
+        setMargens(mar); setPrecos(pre); setDespesas(des); setProducoes(prod);
+        setPedidos(ped); setVendas(ven);
+        setLastSync(new Date());
+      }catch(e){console.warn("Auto-sync erro:",e);}
+    },20000);
+    return()=>clearInterval(iv);
+  },[loaded]);
+
+  // Sincronização manual
+  async function sincronizar(){
+    setSyncing(true);
+    try{
+      const[u,id,ent,fic,mar,pre,des,prod,ped,ven]=await Promise.all([
+        dbGet("ac4_usr",DEFAULT_ADMIN), dbGet("ac4_idef",[]),
+        dbGet("ac4_ent",[]),            dbGet("ac4_fic",[]),
+        dbGet("ac4_mar",{}),            dbGet("ac4_pre",{}),
+        dbGet("ac4_des",[]),            dbGet("ac4_prod",[]),
+        dbGet("ac4_ped",[]),            dbGet("ac4_ven",[]),
+      ]);
+      setUsuarios(u); setIdef(id); setEntradas(ent); setFichas(fic);
+      setMargens(mar); setPrecos(pre); setDespesas(des); setProducoes(prod);
+      setPedidos(ped); setVendas(ven);
+      setLastSync(new Date());
+      setDbError("");
+    }catch(e){alert("Erro ao sincronizar. Verifique a conexão.");}
+    finally{setSyncing(false);}
+  }
+
+  // ── SALVAMENTO — grava no storage compartilhado a cada mudança ──────────
   useEffect(()=>{const s=document.createElement("style");s.id="ng-theme";s.textContent=CSS_VARS;document.head.appendChild(s);return()=>s.remove();},[]);
-  useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");lsSet("nagarrafa-theme",dark?"dark":"light");},[dark]);
-  useEffect(()=>{lsSet("ac4_usr",  usuarios);},[usuarios]);
-  useEffect(()=>{lsSet("ac4_idef", idef);},[idef]);
-  useEffect(()=>{lsSet("ac4_ent",  entradas);},[entradas]);
-  useEffect(()=>{lsSet("ac4_fic",  fichas);},[fichas]);
-  useEffect(()=>{lsSet("ac4_mar",  margens);},[margens]);
-  useEffect(()=>{lsSet("ac4_pre",  precos);},[precos]);
-  useEffect(()=>{lsSet("ac4_des",  despesas);},[despesas]);
-  useEffect(()=>{lsSet("ac4_prod", producoes);},[producoes]);
-  useEffect(()=>{lsSet("ac4_ped",  pedidos);},[pedidos]);
-  useEffect(()=>{lsSet("ac4_ven",  vendas);},[vendas]);
+  useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");if(loaded)dbSet("nagarrafa-theme",dark?"dark":"light");},[dark]);
+  useEffect(()=>{if(loaded)dbSet("ac4_usr",  usuarios);},[usuarios]);
+  useEffect(()=>{if(loaded)dbSet("ac4_idef", idef);},[idef]);
+  useEffect(()=>{if(loaded)dbSet("ac4_ent",  entradas);},[entradas]);
+  useEffect(()=>{if(loaded)dbSet("ac4_fic",  fichas);},[fichas]);
+  useEffect(()=>{if(loaded)dbSet("ac4_mar",  margens);},[margens]);
+  useEffect(()=>{if(loaded)dbSet("ac4_pre",  precos);},[precos]);
+  useEffect(()=>{if(loaded)dbSet("ac4_des",  despesas);},[despesas]);
+  useEffect(()=>{if(loaded)dbSet("ac4_prod", producoes);},[producoes]);
+  useEffect(()=>{if(loaded)dbSet("ac4_ped",  pedidos);},[pedidos]);
+  useEffect(()=>{if(loaded)dbSet("ac4_ven",  vendas);},[vendas]);
+
+  // ── TELA DE CARREGAMENTO ──────────────────────────────────────────────────
+  if(!loaded){
+    return(
+      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#020208,#080518)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:20,padding:24}}>
+        <div style={{fontSize:56,filter:"drop-shadow(0 0 20px rgba(124,58,237,.6))"}}>🫐</div>
+        <p style={{color:"white",fontFamily:"system-ui,sans-serif",fontSize:16,fontWeight:600,opacity:.8}}>Conectando ao banco de dados…</p>
+        <div style={{width:180,height:4,background:"rgba(255,255,255,.1)",borderRadius:4,overflow:"hidden"}}>
+          <div style={{width:"60%",height:"100%",background:"linear-gradient(90deg,#7c3aed,#a78bfa)",borderRadius:4,animation:"slide 1.2s ease-in-out infinite"}}/>
+        </div>
+        <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
+      </div>
+    );
+  }
+
+  if(dbError){
+    return(
+      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#020208,#080518)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,padding:32}}>
+        <div style={{fontSize:48}}>⚠️</div>
+        <h2 style={{color:"white",fontFamily:"system-ui,sans-serif",margin:0}}>Erro de configuração</h2>
+        <p style={{color:"rgba(255,255,255,.7)",fontFamily:"system-ui,sans-serif",fontSize:14,textAlign:"center",maxWidth:460,lineHeight:1.6}}>{dbError}</p>
+        <div style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.15)",borderRadius:12,padding:20,maxWidth:460,width:"100%",fontFamily:"monospace",fontSize:13,color:"#a78bfa",lineHeight:1.8}}>
+          <p style={{margin:"0 0 8px",color:"rgba(255,255,255,.5)",fontFamily:"system-ui",fontSize:12}}>Adicione no .env ou nas variáveis do Vercel:</p>
+          <p style={{margin:0}}>VITE_SUPABASE_URL=https://xxxx.supabase.co</p>
+          <p style={{margin:0}}>VITE_SUPABASE_ANON_KEY=eyJhb...</p>
+        </div>
+        <button onClick={()=>window.location.reload()} style={{background:"#7c3aed",color:"white",border:"none",borderRadius:8,padding:"10px 24px",fontSize:14,cursor:"pointer",fontFamily:"system-ui,sans-serif",fontWeight:600}}>
+          🔄 Tentar novamente
+        </button>
+      </div>
+    );
+  }
 
   const flatEnt=flatEntradas(entradas);
   function custMedioFn(iid){const es=flatEnt.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
@@ -2257,6 +2423,11 @@ export default function App(){
                   <Pill label={role} color={ROLE_COLORS[role].color} bg={ROLE_COLORS[role].bg}/>
                 </div>
               </div>
+              {/* Status de sincronização */}
+              <button onClick={sincronizar} disabled={syncing} style={{width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:syncing?"wait":"pointer",borderRadius:8,padding:"6px 8px",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6,opacity:syncing?.7:1}}>
+                <span style={{fontSize:14}}>{syncing?"⏳":"🔄"}</span>
+                <span>{syncing?"Sincronizando…":lastSync?"Sincronizado "+lastSync.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Sincronizar"}</span>
+              </button>
               <div style={{display:"flex",gap:6}}>
                 <button onClick={()=>setDark(d=>!d)} style={{flex:1,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,padding:"6px 8px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                   {dark?"☀️ Claro":"🌙 Escuro"}
@@ -2268,6 +2439,9 @@ export default function App(){
             </>
           ):(
             <>
+              <button onClick={sincronizar} disabled={syncing} title={syncing?"Sincronizando…":"Sincronizar dados"} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:syncing?"wait":"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
+                {syncing?"⏳":"🔄"}
+              </button>
               <button onClick={()=>setDark(d=>!d)} title={dark?"Modo claro":"Modo escuro"} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"white",cursor:"pointer",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
                 {dark?"☀️":"🌙"}
               </button>
