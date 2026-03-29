@@ -2059,19 +2059,33 @@ const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
 async function dbLoad(){
   const res = await fetch(JSONBIN_URL+"/latest",{
-    headers:{"X-Master-Key": JSONBIN_KEY, "X-Bin-Meta": "false"},
+    headers:{
+      "X-Master-Key": JSONBIN_KEY,
+      "X-Bin-Meta":   "false",
+    },
   });
-  if(!res.ok) throw new Error("JSONBin GET falhou: "+res.status);
-  return res.json(); // retorna o objeto completo
+  if(res.status===401) throw new Error("Chave inválida (401). Verifique JSONBIN_KEY.");
+  if(res.status===404) throw new Error("Bin não encontrado (404). Verifique JSONBIN_BIN_ID.");
+  if(!res.ok) throw new Error("Erro ao carregar dados: HTTP "+res.status);
+  const json = await res.json();
+  // JSONBin pode retornar {record:{...},metadata:{...}} ou o objeto direto
+  return json?.record ?? json;
 }
 
 async function dbSave(data){
   const res = await fetch(JSONBIN_URL,{
     method:"PUT",
-    headers:{"X-Master-Key": JSONBIN_KEY, "Content-Type":"application/json"},
+    headers:{
+      "X-Master-Key":  JSONBIN_KEY,
+      "Content-Type":  "application/json",
+      "X-Bin-Versioning": "false",
+    },
     body: JSON.stringify(data),
   });
-  if(!res.ok) throw new Error("JSONBin PUT falhou: "+res.status);
+  if(!res.ok){
+    const txt = await res.text().catch(()=>"");
+    throw new Error("Erro ao salvar: HTTP "+res.status+" — "+txt.slice(0,100));
+  }
 }
 
 const EMPTY_DB = {
