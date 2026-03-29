@@ -2047,44 +2047,47 @@ function FluxoCaixaTab({entradas,vendas,fichasCalc,getPreco,idef}){
 const DEFAULT_ADMIN=[{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}];
 
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────────
-// Substitua pelos valores do seu projeto no painel do Supabase
-// (Settings → API)
-const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || "";
-const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-const TABLE         = "nagarrafa_data";
+// Cole aqui as credenciais do seu projeto Supabase
+// Painel Supabase → Settings → API
+const SUPABASE_URL = https:/updjtkbscnhjmfyfxrgv.supabase.com;       // ex: https://abcdef.supabase.co
+const SUPABASE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwZGp0a2JzY25oam1meWZ4cmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3OTQ5MzgsImV4cCI6MjA5MDM3MDkzOH0.KBSoYXdiEVTVu4lkP07y3S2AbiK_5nMbVBr1D0Vabh8;          // ex: eyJhbGciOiJIUzI1NiIs...
+const TABLE        = "nagarrafa_data";
 
 // Cliente Supabase mínimo — sem dependência de pacote extra
 async function sbFetch(path, options={}){
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const res = await fetch(url, {
     ...options,
     headers:{
-      "apikey": SUPABASE_KEY,
+      "apikey":        SUPABASE_KEY,
       "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      "Prefer": "return=representation",
+      "Content-Type":  "application/json",
       ...(options.headers||{}),
     },
   });
-  if(!res.ok) throw new Error(await res.text());
+  if(!res.ok){
+    const err = await res.text();
+    throw new Error(`Supabase ${res.status}: ${err}`);
+  }
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
 
 async function dbGet(key, def){
   try{
-    const rows = await sbFetch(`${TABLE}?key=eq.${key}&select=value`);
+    const rows = await sbFetch(`${TABLE}?key=eq.${encodeURIComponent(key)}&select=value`);
     return rows?.length ? rows[0].value : def;
-  }catch(e){ console.warn("dbGet",key,e); return def; }
+  }catch(e){ console.warn("dbGet erro ["+key+"]:", e.message); return def; }
 }
 
 async function dbSet(key, val){
   try{
-    await sbFetch(`${TABLE}`, {
-      method:"POST",
-      headers:{"Prefer":"resolution=merge-duplicates"},
-      body: JSON.stringify({key, value: val, updated_at: new Date().toISOString()}),
+    await sbFetch(TABLE, {
+      method:  "POST",
+      headers: {"Prefer": "resolution=merge-duplicates"},
+      body:    JSON.stringify({key, value: val, updated_at: new Date().toISOString()}),
     });
-  }catch(e){ console.warn("dbSet",key,e); }
+  }catch(e){ console.warn("dbSet erro ["+key+"]:", e.message); }
 }
 
 export default function App(){
