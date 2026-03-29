@@ -2049,9 +2049,8 @@ const DEFAULT_ADMIN=[{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin"
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────────
 // Cole aqui as credenciais do seu projeto Supabase
 // Painel Supabase → Settings → API
-const SUPABASE_URL = https:/updjtkbscnhjmfyfxrgv.supabase.com;       // ex: https://abcdef.supabase.co
-const SUPABASE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwZGp0a2JzY25oam1meWZ4cmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3OTQ5MzgsImV4cCI6MjA5MDM3MDkzOH0.KBSoYXdiEVTVu4lkP07y3S2AbiK_5nMbVBr1D0Vabh8;          // ex: eyJhbGciOiJIUzI1NiIs...
-const TABLE        = "nagarrafa_data";
+const SUPABASE_URL = "https:/updjtkbscnhjmfyfxrgv.supabase.com";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwZGp0a2JzY25oam1meWZ4cmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3OTQ5MzgsImV4cCI6MjA5MDM3MDkzOH0.KBSoYXdiEVTVu4lkP07y3S2AbiK_5nMbVBr1D0Vabh8";
 
 // Cliente Supabase mínimo — sem dependência de pacote extra
 async function sbFetch(path, options={}){
