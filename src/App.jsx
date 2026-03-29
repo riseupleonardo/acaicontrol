@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -2046,50 +2046,41 @@ function FluxoCaixaTab({entradas,vendas,fichasCalc,getPreco,idef}){
 // ── APP PRINCIPAL ──────────────────────────────────────────────────────────
 const DEFAULT_ADMIN=[{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}];
 
-// ── SUPABASE CONFIG ───────────────────────────────────────────────────────
-// ⚠️  EDITE APENAS ESTAS 2 LINHAS com os dados do seu Supabase
-// Painel Supabase → Settings → API
-const SUPABASE_URL = "https://updjtkbscnhjmfyfxrgv.supabase.co";   // ex: https://xyzabc.supabase.co
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwZGp0a2JzY25oam1meWZ4cmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3OTQ5MzgsImV4cCI6MjA5MDM3MDkzOH0.KBSoYXdiEVTVu4lkP07y3S2AbiK_5nMbVBr1D0Vabh8";   // ex: eyJhbGciOiJIUzI1NiIs...
-const TABLE        = "nagarrafa_data";
-// ─────────────────────────────────────────────────────────────────────────
+// ── BANCO DE DADOS — JSONBin.io ──────────────────────────────────────────
+// 1. Acesse https://jsonbin.io e crie uma conta grátis
+// 2. Vá em "API Keys" e copie a Master Key
+// 3. Clique em "Create Bin", cole {} e salve — copie o BIN ID da URL
+// ⚠️  EDITE APENAS ESTAS 2 LINHAS:
+const JSONBIN_KEY    = "$2a$10$wRZj63KqHLGzBNcwYKVICOMssRb7gEk7LOn9rw.cxZG0BfRCBT6J.";
+const JSONBIN_BIN_ID = "69c984c536566621a85cb4dd";
+// ────────────────────────────────────────────────────────────────────────
 
-// Cliente Supabase mínimo — sem dependência de pacote extra
-async function sbFetch(path, options={}){
-  const url = `${SUPABASE_URL}/rest/v1/${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers:{
-      "apikey":        SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Content-Type":  "application/json",
-      ...(options.headers||{}),
-    },
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+async function dbLoad(){
+  const res = await fetch(JSONBIN_URL+"/latest",{
+    headers:{"X-Master-Key": JSONBIN_KEY, "X-Bin-Meta": "false"},
   });
-  if(!res.ok){
-    const err = await res.text();
-    throw new Error(`Supabase ${res.status}: ${err}`);
-  }
-  const txt = await res.text();
-  return txt ? JSON.parse(txt) : null;
+  if(!res.ok) throw new Error("JSONBin GET falhou: "+res.status);
+  return res.json(); // retorna o objeto completo
 }
 
-async function dbGet(key, def){
-  try{
-    const rows = await sbFetch(`${TABLE}?key=eq.${encodeURIComponent(key)}&select=value`);
-    return rows?.length ? rows[0].value : def;
-  }catch(e){ console.warn("dbGet erro ["+key+"]:", e.message); return def; }
+async function dbSave(data){
+  const res = await fetch(JSONBIN_URL,{
+    method:"PUT",
+    headers:{"X-Master-Key": JSONBIN_KEY, "Content-Type":"application/json"},
+    body: JSON.stringify(data),
+  });
+  if(!res.ok) throw new Error("JSONBin PUT falhou: "+res.status);
 }
 
-async function dbSet(key, val){
-  try{
-    await sbFetch(TABLE, {
-      method:  "POST",
-      headers: {"Prefer": "resolution=merge-duplicates"},
-      body:    JSON.stringify({key, value: val, updated_at: new Date().toISOString()}),
-    });
-  }catch(e){ console.warn("dbSet erro ["+key+"]:", e.message); }
-}
+const EMPTY_DB = {
+  ac4_usr:  [{id:"admin-root",nome:"admin",senha:"admin123",role:"Admin",ativo:true}],
+  ac4_idef: [], ac4_ent: [], ac4_fic: [],
+  ac4_mar:  {}, ac4_pre: {}, ac4_des: [],
+  ac4_prod: [], ac4_ped: [], ac4_ven: [],
+  theme: "light",
+};
 
 export default function App(){
   const [dark,setDark]=useState(false);
@@ -2099,8 +2090,11 @@ export default function App(){
   const [syncing,setSyncing]=useState(false);
   const [lastSync,setLastSync]=useState(null);
   const [dbError,setDbError]=useState("");
+  // Buffer de salvamento — acumula mudanças e grava em lote
+  const pendingRef = useRef(null);
+  const dbRef = useRef(EMPTY_DB); // cópia em memória do banco completo
 
-  const [usuarios,setUsuarios]  =useState(DEFAULT_ADMIN);
+  const [usuarios,setUsuarios]  =useState(EMPTY_DB.ac4_usr);
   const [idef,setIdef]          =useState([]);
   const [entradas,setEntradas]  =useState([]);
   const [fichas,setFichas]      =useState([]);
@@ -2113,7 +2107,8 @@ export default function App(){
 
   // ── CARREGAMENTO INICIAL ──────────────────────────────────────────────────
   useEffect(()=>{
-    if(SUPABASE_URL.includes("COLE_SUA_URL") || SUPABASE_KEY.includes("COLE_SUA_KEY")){
+    const isPlaceholder = JSONBIN_KEY.includes("COLE_") || JSONBIN_BIN_ID.includes("COLE_");
+    if(isPlaceholder){
       setDbError("PLACEHOLDER");
       setLoaded(true);
       return;
@@ -2121,27 +2116,17 @@ export default function App(){
     async function loadAll(){
       setSyncing(true);
       try{
-        const [u,id,ent,fic,mar,pre,des,prod,ped,ven,theme]=await Promise.all([
-          dbGet("ac4_usr",DEFAULT_ADMIN),
-          dbGet("ac4_idef",[]),
-          dbGet("ac4_ent",[]),
-          dbGet("ac4_fic",[]),
-          dbGet("ac4_mar",{}),
-          dbGet("ac4_pre",{}),
-          dbGet("ac4_des",[]),
-          dbGet("ac4_prod",[]),
-          dbGet("ac4_ped",[]),
-          dbGet("ac4_ven",[]),
-          dbGet("nagarrafa-theme","light"),
-        ]);
-        setUsuarios(u); setIdef(id); setEntradas(ent); setFichas(fic);
-        setMargens(mar); setPrecos(pre); setDespesas(des); setProducoes(prod);
-        setPedidos(ped); setVendas(ven);
-        setDark(theme==="dark");
+        const data = await dbLoad();
+        const d = {...EMPTY_DB, ...data};
+        dbRef.current = d;
+        setUsuarios(d.ac4_usr); setIdef(d.ac4_idef); setEntradas(d.ac4_ent);
+        setFichas(d.ac4_fic);   setMargens(d.ac4_mar); setPrecos(d.ac4_pre);
+        setDespesas(d.ac4_des); setProducoes(d.ac4_prod); setPedidos(d.ac4_ped);
+        setVendas(d.ac4_ven);   setDark(d.theme==="dark");
         setLastSync(new Date());
         setDbError("");
       }catch(e){
-        setDbError("Erro ao conectar ao banco de dados. Verifique as variáveis de ambiente.");
+        setDbError(e.message||"Erro ao conectar. Verifique a Key e o Bin ID.");
         console.error("loadAll:",e);
       }finally{
         setSyncing(false);
@@ -2151,66 +2136,62 @@ export default function App(){
     loadAll();
   },[]);
 
-  // ── AUTO-SYNC a cada 20s (busca mudanças de outros usuários) ──────────────
-  useEffect(()=>{
-    if(!loaded)return;
-    const iv=setInterval(async()=>{
-      if(document.hidden)return; // não sincroniza se aba estiver em segundo plano
-      try{
-        const[u,id,ent,fic,mar,pre,des,prod,ped,ven]=await Promise.all([
-          dbGet("ac4_usr",DEFAULT_ADMIN),
-          dbGet("ac4_idef",[]),
-          dbGet("ac4_ent",[]),
-          dbGet("ac4_fic",[]),
-          dbGet("ac4_mar",{}),
-          dbGet("ac4_pre",{}),
-          dbGet("ac4_des",[]),
-          dbGet("ac4_prod",[]),
-          dbGet("ac4_ped",[]),
-          dbGet("ac4_ven",[]),
-        ]);
-        setUsuarios(u); setIdef(id); setEntradas(ent); setFichas(fic);
-        setMargens(mar); setPrecos(pre); setDespesas(des); setProducoes(prod);
-        setPedidos(ped); setVendas(ven);
-        setLastSync(new Date());
-      }catch(e){console.warn("Auto-sync erro:",e);}
-    },20000);
-    return()=>clearInterval(iv);
-  },[loaded]);
+  // ── GRAVAÇÃO DEBOUNCED — salva 1s após última mudança ─────────────────────
+  function scheduleSave(patch){
+    dbRef.current = {...dbRef.current, ...patch};
+    if(pendingRef.current) clearTimeout(pendingRef.current);
+    pendingRef.current = setTimeout(async()=>{
+      try{ await dbSave(dbRef.current); setLastSync(new Date()); }
+      catch(e){ console.warn("Erro ao salvar:",e.message); }
+    },1000);
+  }
 
-  // Sincronização manual
+  // ── AUTO-SYNC a cada 30s ──────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!loaded||dbError)return;
+    const iv=setInterval(async()=>{
+      if(document.hidden)return;
+      try{
+        const data=await dbLoad();
+        const d={...EMPTY_DB,...data};
+        dbRef.current=d;
+        setUsuarios(d.ac4_usr); setIdef(d.ac4_idef); setEntradas(d.ac4_ent);
+        setFichas(d.ac4_fic);   setMargens(d.ac4_mar); setPrecos(d.ac4_pre);
+        setDespesas(d.ac4_des); setProducoes(d.ac4_prod); setPedidos(d.ac4_ped);
+        setVendas(d.ac4_ven);   setLastSync(new Date());
+      }catch(e){console.warn("Auto-sync erro:",e.message);}
+    },30000);
+    return()=>clearInterval(iv);
+  },[loaded,dbError]);
+
+  // ── SINCRONIZAÇÃO MANUAL ──────────────────────────────────────────────────
   async function sincronizar(){
     setSyncing(true);
     try{
-      const[u,id,ent,fic,mar,pre,des,prod,ped,ven]=await Promise.all([
-        dbGet("ac4_usr",DEFAULT_ADMIN), dbGet("ac4_idef",[]),
-        dbGet("ac4_ent",[]),            dbGet("ac4_fic",[]),
-        dbGet("ac4_mar",{}),            dbGet("ac4_pre",{}),
-        dbGet("ac4_des",[]),            dbGet("ac4_prod",[]),
-        dbGet("ac4_ped",[]),            dbGet("ac4_ven",[]),
-      ]);
-      setUsuarios(u); setIdef(id); setEntradas(ent); setFichas(fic);
-      setMargens(mar); setPrecos(pre); setDespesas(des); setProducoes(prod);
-      setPedidos(ped); setVendas(ven);
-      setLastSync(new Date());
-      setDbError("");
-    }catch(e){alert("Erro ao sincronizar. Verifique a conexão.");}
+      const data=await dbLoad();
+      const d={...EMPTY_DB,...data};
+      dbRef.current=d;
+      setUsuarios(d.ac4_usr); setIdef(d.ac4_idef); setEntradas(d.ac4_ent);
+      setFichas(d.ac4_fic);   setMargens(d.ac4_mar); setPrecos(d.ac4_pre);
+      setDespesas(d.ac4_des); setProducoes(d.ac4_prod); setPedidos(d.ac4_ped);
+      setVendas(d.ac4_ven);   setLastSync(new Date()); setDbError("");
+    }catch(e){alert("Erro ao sincronizar: "+e.message);}
     finally{setSyncing(false);}
   }
 
-  // ── SALVAMENTO — grava no storage compartilhado a cada mudança ──────────
+  // ── WATCHERS — cada mudança de estado dispara um save ─────────────────────
   useEffect(()=>{const s=document.createElement("style");s.id="ng-theme";s.textContent=CSS_VARS;document.head.appendChild(s);return()=>s.remove();},[]);
-  useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");if(loaded)dbSet("nagarrafa-theme",dark?"dark":"light");},[dark]);
-  useEffect(()=>{if(loaded)dbSet("ac4_usr",  usuarios);},[usuarios]);
-  useEffect(()=>{if(loaded)dbSet("ac4_idef", idef);},[idef]);
-  useEffect(()=>{if(loaded)dbSet("ac4_ent",  entradas);},[entradas]);
-  useEffect(()=>{if(loaded)dbSet("ac4_fic",  fichas);},[fichas]);
-  useEffect(()=>{if(loaded)dbSet("ac4_mar",  margens);},[margens]);
-  useEffect(()=>{if(loaded)dbSet("ac4_pre",  precos);},[precos]);
-  useEffect(()=>{if(loaded)dbSet("ac4_des",  despesas);},[despesas]);
-  useEffect(()=>{if(loaded)dbSet("ac4_prod", producoes);},[producoes]);
-  useEffect(()=>{if(loaded)dbSet("ac4_ped",  pedidos);},[pedidos]);
-  useEffect(()=>{if(loaded)dbSet("ac4_ven",  vendas);},[vendas]);
+  useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");if(loaded&&!dbError)scheduleSave({theme:dark?"dark":"light"});},[dark]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_usr:usuarios});},[usuarios]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_idef:idef});},[idef]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_ent:entradas});},[entradas]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_fic:fichas});},[fichas]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_mar:margens});},[margens]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_pre:precos});},[precos]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_des:despesas});},[despesas]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_prod:producoes});},[producoes]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_ped:pedidos});},[pedidos]);
+  useEffect(()=>{if(loaded&&!dbError)scheduleSave({ac4_ven:vendas});},[vendas]);
 
   // ── TELA DE CARREGAMENTO ──────────────────────────────────────────────────
   if(!loaded){
@@ -2234,22 +2215,28 @@ export default function App(){
         <h2 style={{color:"white",margin:0,fontSize:22}}>{isPlaceholder?"Configure o banco de dados":"Erro de conexão"}</h2>
         <p style={{color:"rgba(255,255,255,.7)",fontSize:14,textAlign:"center",maxWidth:480,lineHeight:1.7,margin:0}}>
           {isPlaceholder
-            ? "Abra o arquivo App.jsx no GitHub e substitua as 2 linhas abaixo pelos dados do seu Supabase:"
-            : dbError}
+            ? "Abra o arquivo App.jsx e substitua as 2 linhas abaixo pelos dados do seu JSONBin:"
+            : "Erro: "+dbError+". Verifique a Master Key e o Bin ID no arquivo App.jsx."}
         </p>
-        {isPlaceholder&&(
-          <div style={{background:"rgba(0,0,0,.5)",border:"1px solid rgba(124,58,237,.4)",borderRadius:12,padding:20,maxWidth:520,width:"100%",fontFamily:"monospace",fontSize:13,lineHeight:2}}>
-            <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.35)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Procure no App.jsx e substitua:</p>
-            <p style={{margin:0,color:"#ef4444"}}>const SUPABASE_URL = "COLE_SUA_URL_AQUI";</p>
-            <p style={{margin:0,color:"#ef4444"}}>const SUPABASE_KEY = "COLE_SUA_KEY_AQUI";</p>
-            <div style={{height:1,background:"rgba(255,255,255,.1)",margin:"12px 0"}}/>
-            <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.35)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Pelos seus valores reais:</p>
-            <p style={{margin:0,color:"#a78bfa"}}>const SUPABASE_URL = "https://xxxx.supabase.co";</p>
-            <p style={{margin:0,color:"#a78bfa"}}>const SUPABASE_KEY = "eyJhbGci...";</p>
-            <div style={{height:1,background:"rgba(255,255,255,.1)",margin:"12px 0"}}/>
-            <p style={{margin:0,color:"rgba(255,255,255,.4)",fontFamily:"system-ui",fontSize:12}}>📍 Supabase → Settings → API → Project URL + anon/public key</p>
-          </div>
-        )}
+        <div style={{background:"rgba(0,0,0,.5)",border:"1px solid rgba(124,58,237,.4)",borderRadius:12,padding:20,maxWidth:540,width:"100%",fontFamily:"monospace",fontSize:13,lineHeight:2}}>
+          {isPlaceholder?(
+            <>
+              <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.4)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Encontre no App.jsx e substitua:</p>
+              <p style={{margin:0,color:"#ef4444"}}>const JSONBIN_KEY = "COLE_SUA_MASTER_KEY_AQUI";</p>
+              <p style={{margin:0,color:"#ef4444"}}>const JSONBIN_BIN_ID = "COLE_O_BIN_ID_AQUI";</p>
+              <div style={{height:1,background:"rgba(255,255,255,.1)",margin:"12px 0"}}/>
+              <p style={{margin:"0 0 4px",color:"rgba(255,255,255,.4)",fontFamily:"system-ui",fontSize:11,textTransform:"uppercase",letterSpacing:1}}>Como obter:</p>
+              <p style={{margin:0,color:"rgba(255,255,255,.6)",fontFamily:"system-ui",fontSize:12,lineHeight:1.8}}>
+                1. Acesse <span style={{color:"#a78bfa"}}>jsonbin.io</span> → crie conta grátis{"\n"}
+                2. Vá em "API Keys" → copie a <span style={{color:"#a78bfa"}}>Master Key</span>{"\n"}
+                3. Clique em "Create Bin" → cole <span style={{color:"#a78bfa"}}>{"{}"}</span> → salve{"\n"}
+                4. Copie o <span style={{color:"#a78bfa"}}>BIN ID</span> que aparece na URL
+              </p>
+            </>
+          ):(
+            <p style={{margin:0,color:"#fca5a5"}}>Verifique se a Master Key e o Bin ID estão corretos no arquivo App.jsx.</p>
+          )}
+        </div>
         <button onClick={()=>window.location.reload()} style={{background:"#7c3aed",color:"white",border:"none",borderRadius:8,padding:"10px 28px",fontSize:14,cursor:"pointer",fontWeight:600,marginTop:8}}>
           🔄 Tentar novamente
         </button>
