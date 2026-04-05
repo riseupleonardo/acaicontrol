@@ -216,15 +216,51 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
   const [nItem,setNItem]=useState(blankItem);
   const [carrinho,setCarrinho]=useState([]);
   const [expanded,setExpanded]=useState({});
+  const [editandoId,setEditandoId]=useState(null);
+  const [nItemEdit,setNItemEdit]=useState(blankItem);
 
   const ins=idef.find(i=>i.id===nItem.insumoId);
   const cap=ins?.capacidadeUnitaria;
   const qtdItem=cap&&+nItem.numEmb>0?+nItem.numEmb*+cap:+nItem.numEmb||0;
   const custoItem=+nItem.numEmb>0&&+nItem.precoUnit>0?+nItem.numEmb*(+nItem.precoUnit):0;
 
+  const insEdit=idef.find(i=>i.id===nItemEdit.insumoId);
+  const capEdit=insEdit?.capacidadeUnitaria;
+  const qtdItemEdit=capEdit&&+nItemEdit.numEmb>0?+nItemEdit.numEmb*+capEdit:+nItemEdit.numEmb||0;
+  const custoItemEdit=+nItemEdit.numEmb>0&&+nItemEdit.precoUnit>0?+nItemEdit.numEmb*(+nItemEdit.precoUnit):0;
+
   // Normaliza todas as entradas para cálculo de CM (usa flatEntradas global)
   const flatEnt=flatEntradas(entradas);
   function cmAtual(iid){const es=flatEnt.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
+
+  function addItemEditFn(){
+    if(!nItemEdit.insumoId)return alert("Selecione o insumo.");
+    if(!nItemEdit.numEmb||+nItemEdit.numEmb<=0)return alert("Informe a quantidade.");
+    if(!nItemEdit.precoUnit||+nItemEdit.precoUnit<=0)return alert("Informe o preço.");
+    const qtd=+qtdItemEdit.toFixed(6);
+    const custo=+custoItemEdit.toFixed(4);
+    setEntradas(entradas.map(e=>{
+      if(e.id!==editandoId)return e;
+      const novosItems=[...(e.items||[]),{
+        id:uid(),insumoId:nItemEdit.insumoId,
+        numEmb:+nItemEdit.numEmb,precoUnit:+nItemEdit.precoUnit,
+        capUsada:capEdit||null,qtd,custoTotal:custo,
+      }];
+      const novoTotal=novosItems.reduce((s,i)=>s+i.custoTotal,0);
+      return{...e,items:novosItems,totalCompra:+novoTotal.toFixed(4)};
+    }));
+    setNItemEdit(blankItem);
+  }
+
+  function removerItemDaCompra(compraId,itemId){
+    if(!window.confirm("Remover este item da compra?"))return;
+    setEntradas(entradas.map(e=>{
+      if(e.id!==compraId)return e;
+      const novosItems=(e.items||[]).filter(i=>i.id!==itemId);
+      const novoTotal=novosItems.reduce((s,i)=>s+i.custoTotal,0);
+      return{...e,items:novosItems,totalCompra:+novoTotal.toFixed(4)};
+    }));
+  }
 
   function addItem(){
     if(!nItem.insumoId)return alert("Selecione o insumo.");
@@ -411,8 +447,11 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
                   <td style={{...S.td,fontWeight:800,color:"#1d4ed8",fontSize:15}}>{fR(c.total)}</td>
                   <td style={S.td}>{c.pagamento&&c.pagamento!=="—"?<span style={{background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{c.pagamento}</span>:<span style={{color:"var(--text4)"}}>—</span>}</td>
                   <td style={S.td}>
-                    <button style={{...S.bsm,marginRight:4}} onClick={e=>{e.stopPropagation();setExpanded(ex=>({...ex,[c.id]:!ex[c.id]}))}}>
+                    <button style={{...S.bsm,marginRight:4}} onClick={e=>{e.stopPropagation();setExpanded(ex=>({...ex,[c.id]:!ex[c.id]}));if(editandoId===c.id)setEditandoId(null);}}>
                       {isOpen?"▲ Recolher":"▼ Detalhar"}
+                    </button>
+                    <button style={{...S.bsm,color:"#7c3aed",marginRight:4,background:"var(--accent-soft)"}} onClick={e=>{e.stopPropagation();setEditandoId(editandoId===c.id?null:c.id);setNItemEdit(blankItem);setExpanded(ex=>({...ex,[c.id]:true}));}}>
+                      {editandoId===c.id?"✕ Fechar":"✏️ Editar"}
                     </button>
                     <button style={{...S.bsm,color:"#ef4444"}} onClick={e=>{e.stopPropagation();if(window.confirm("Remover esta compra?"))setEntradas(entradas.filter(x=>x.id!==c.id))}}>🗑️</button>
                   </td>
@@ -422,7 +461,7 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
                     <td colSpan={6} style={{padding:0,borderBottom:"1px solid var(--border3)"}}>
                       <div style={{background:"rgba(124,58,237,.04)",borderLeft:"3px solid #a78bfa",padding:"10px 20px"}}>
                         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                          <thead><tr>{["Insumo","Embalagens","Qtd. total","Preço/emb.","Custo/un","Subtotal"].map(h2=><th key={h2} style={{...S.th,background:"transparent",borderBottom:"1px solid var(--border2)"}}>{h2}</th>)}</tr></thead>
+                          <thead><tr>{["Insumo","Embalagens","Qtd. total","Preço/emb.","Custo/un","Subtotal",""].map(h2=><th key={h2} style={{...S.th,background:"transparent",borderBottom:"1px solid var(--border2)"}}>{h2}</th>)}</tr></thead>
                           <tbody>
                             {c.items.map((it,idx)=>{
                               const i2=idef.find(i=>i.id===it.insumoId);
@@ -435,11 +474,40 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
                                   <td style={{...S.td,border:"none"}}>{it.precoUnit?fR(it.precoUnit):"—"}</td>
                                   <td style={{...S.td,color:"#7c3aed",fontWeight:600,border:"none"}}>{cuU>0?`${fR(cuU)}/${i2?.unidade}`:"—"}</td>
                                   <td style={{...S.td,fontWeight:700,color:"#1d4ed8",border:"none"}}>{fR(it.custoTotal)}</td>
+                                  <td style={{...S.td,border:"none"}}>
+                                    {editandoId===c.id&&it.id&&<button style={{...S.bsm,color:"#ef4444",fontSize:11}} onClick={()=>removerItemDaCompra(c.id,it.id)}>🗑️</button>}
+                                  </td>
                                 </tr>
                               );
                             })}
                           </tbody>
                         </table>
+                        {/* ── Adicionar item à compra editada ── */}
+                        {editandoId===c.id&&(
+                          <div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed var(--border2)"}}>
+                            <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#7c3aed"}}>➕ Adicionar item a esta compra</p>
+                            <div style={{display:"grid",gridTemplateColumns:"2.5fr 1fr 1fr auto",gap:8,alignItems:"flex-end"}}>
+                              <div>
+                                <Lbl s="Insumo"/>
+                                <select style={S.inp} value={nItemEdit.insumoId} onChange={e=>setNItemEdit({...blankItem,insumoId:e.target.value})}>
+                                  <option value="">Selecione...</option>
+                                  {idef.map(i=>{const capI=i.capacidadeUnitaria;const capStr=capI?` · emb.${capI} ${i.unidade}`:"";return<option key={i.id} value={i.id}>{i.nome} ({i.unidade}){capStr}</option>;})}
+                                </select>
+                              </div>
+                              <div>
+                                <Lbl s={capEdit?"Qtd. emb.":"Quantidade"}/>
+                                <input style={S.inp} type="number" step="1" min="1" value={nItemEdit.numEmb} onChange={e=>setNItemEdit({...nItemEdit,numEmb:e.target.value})}/>
+                                {capEdit&&+nItemEdit.numEmb>0&&<div style={{fontSize:10,color:"#7c3aed",marginTop:2}}>= {qtdItemEdit.toFixed(3)} {insEdit?.unidade}</div>}
+                              </div>
+                              <div>
+                                <Lbl s="Preço/emb. (R$)"/>
+                                <input style={S.inp} type="number" step="0.01" min="0" value={nItemEdit.precoUnit} onChange={e=>setNItemEdit({...nItemEdit,precoUnit:e.target.value})}/>
+                                {custoItemEdit>0&&<div style={{fontSize:10,color:"#059669",marginTop:2}}>Total: {fR(custoItemEdit)}</div>}
+                              </div>
+                              <button style={{...S.btn,padding:"8px 14px",fontSize:12}} onClick={addItemEditFn}>+ Add</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -453,8 +521,30 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
   </>);
 }
 
-function EstoqueTab({idefComCusto}){
+function EstoqueTab({idefComCusto,entradas,setEntradas}){
   const totalValor=idefComCusto.reduce((s,i)=>s+Math.max(0,i.estoque)*i.custMedio,0);
+  const [editando,setEditando]=useState(null); // {id, valor}
+  const today=new Date().toISOString().slice(0,10);
+
+  function salvarAjuste(){
+    if(!editando||editando.valor==="")return;
+    const ins=idefComCusto.find(i=>i.id===editando.id);
+    if(!ins)return;
+    const novoEstoque=+editando.valor;
+    const delta=novoEstoque-ins.estoque; // quanto adicionar (pode ser negativo)
+    if(Math.abs(delta)<0.0001){setEditando(null);return;}
+    // Cria entrada de ajuste direta (formato legado — item individual)
+    setEntradas([...entradas,{
+      id:uid(),insumoId:editando.id,
+      qtd:+delta.toFixed(6),
+      custoTotal:0, // ajuste não tem custo
+      data:today,
+      tipo:"ajuste",
+      pagamento:"—",
+    }]);
+    setEditando(null);
+  }
+
   return(<>
     <G cols="1fr 1fr 1fr 1fr" gap={12} mb={20}>
       <KPI label="📦 Em estoque" value={idefComCusto.filter(i=>i.estoque>0.001).length} color="#7c3aed"/>
@@ -463,21 +553,54 @@ function EstoqueTab({idefComCusto}){
       <KPI label="🛒 Total de tipos" value={idefComCusto.length} color="#3730a3"/>
     </G>
     <Card title="📦 Estoque — Custo Médio Ponderado">
-      <p style={{margin:"0 0 14px",fontSize:13,color:"var(--text3)"}}>Custo médio = <strong>Σ(valor pago) ÷ Σ(qtd comprada)</strong></p>
+      <p style={{margin:"0 0 14px",fontSize:13,color:"var(--text3)"}}>Custo médio = <strong>Σ(valor pago) ÷ Σ(qtd comprada)</strong> · Use ✏️ para corrigir o estoque atual após contagem física.</p>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Insumo","Un.","Total Comprado","Total Consumido","Estoque Atual","Custo Médio","Valor em Estoque","Status"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Insumo","Un.","Total Comprado","Total Consumido","Estoque Atual","Custo Médio","Valor em Estoque","Status",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!idefComCusto.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum insumo cadastrado.</td></tr>}
-          {idefComCusto.map(i=>{const neg=i.estoque<-0.0001,bx=i.estoque>=-0.0001&&i.estoque<0.5;return(
-            <tr key={i.id} style={{background:neg?"rgba(239,68,68,.08)":bx?"rgba(245,158,11,.06)":"transparent"}}>
-              <td style={{...S.td,fontWeight:600}}>{i.nome}</td><td style={S.td}>{i.unidade}</td>
-              <td style={S.td}>{i.totalEntradas.toFixed(3)}</td><td style={S.td}>{i.totalConsumido.toFixed(3)}</td>
-              <td style={{...S.td,fontWeight:700,color:neg?"#ef4444":bx?"#d97706":"#059669",fontSize:15}}>{i.estoque.toFixed(3)} {i.unidade}</td>
-              <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>{i.custMedio>0?`${fR(i.custMedio)}/${i.unidade}`:<span style={{color:"var(--text4)",fontSize:12}}>Sem compras</span>}</td>
-              <td style={{...S.td,fontWeight:600}}>{fR(Math.max(0,i.estoque)*i.custMedio)}</td>
-              <td style={S.td}>{neg?<Pill label="❌ Negativo" color="#991b1b" bg="#fee2e2"/>:bx?<Pill label="⚠️ Baixo" color="#92400e" bg="#fef3c7"/>:<Pill label="✅ OK" color="#065f46" bg="#d1fae5"/>}</td>
-            </tr>
-          );})}
+          {!idefComCusto.length&&<tr><td colSpan={9} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum insumo cadastrado.</td></tr>}
+          {idefComCusto.map(i=>{
+            const neg=i.estoque<-0.0001,bx=i.estoque>=-0.0001&&i.estoque<0.5;
+            const isEd=editando?.id===i.id;
+            return(
+              <tr key={i.id} style={{background:isEd?"rgba(124,58,237,.05)":neg?"rgba(239,68,68,.08)":bx?"rgba(245,158,11,.06)":"transparent"}}>
+                <td style={{...S.td,fontWeight:600}}>{i.nome}</td>
+                <td style={S.td}>{i.unidade}</td>
+                <td style={S.td}>{i.totalEntradas.toFixed(3)}</td>
+                <td style={S.td}>{i.totalConsumido.toFixed(3)}</td>
+                <td style={S.td}>
+                  {isEd?(
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <input
+                        type="number" step="0.001"
+                        value={editando.valor}
+                        onChange={e=>setEditando({...editando,valor:e.target.value})}
+                        style={{...S.inp,width:90,padding:"4px 8px",fontWeight:700,color:"#7c3aed"}}
+                        autoFocus
+                        onKeyDown={e=>{if(e.key==="Enter")salvarAjuste();if(e.key==="Escape")setEditando(null);}}
+                      />
+                      <span style={{fontSize:12,color:"var(--text3)"}}>{i.unidade}</span>
+                      <button style={{...S.bsm,background:"#dcfce7",color:"#065f46",border:"1px solid #86efac"}} onClick={salvarAjuste}>✓</button>
+                      <button style={{...S.bsm}} onClick={()=>setEditando(null)}>✕</button>
+                    </div>
+                  ):(
+                    <span style={{fontWeight:700,color:neg?"#ef4444":bx?"#d97706":"#059669",fontSize:15}}>
+                      {i.estoque.toFixed(3)} {i.unidade}
+                    </span>
+                  )}
+                </td>
+                <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>{i.custMedio>0?`${fR(i.custMedio)}/${i.unidade}`:<span style={{color:"var(--text4)",fontSize:12}}>Sem compras</span>}</td>
+                <td style={{...S.td,fontWeight:600}}>{fR(Math.max(0,i.estoque)*i.custMedio)}</td>
+                <td style={S.td}>{neg?<Pill label="❌ Negativo" color="#991b1b" bg="#fee2e2"/>:bx?<Pill label="⚠️ Baixo" color="#92400e" bg="#fef3c7"/>:<Pill label="✅ OK" color="#065f46" bg="#d1fae5"/>}</td>
+                <td style={S.td}>
+                  {!isEd&&(
+                    <button style={{...S.bsm,color:"#7c3aed"}} onClick={()=>setEditando({id:i.id,valor:i.estoque.toFixed(3)})} title="Ajustar estoque">
+                      ✏️
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Card>
@@ -608,11 +731,28 @@ function PrecosTab({fichasCalc,margens,sm,getPreco,precos,sp,canEdit}){
 function ProducaoTab({producoes,setProducoes,fichasCalc,idef,estoqueInsumoFn,estoqueProdutoFn}){
   const today=new Date().toISOString().slice(0,10);
   const blank={fichaId:"",qtd:"",data:today};const [f,setF]=useState(blank);
+  const [editandoProd,setEditandoProd]=useState(null); // {fichaId, valor}
   const fcAt=fichasCalc.find(p=>p.id===f.fichaId);
   const nec=fcAt&&f.qtd&&+f.qtd>0?(fcAt.ings||[]).map(ing=>{const ins=idef.find(i=>i.id===ing.iid);if(!ins)return null;const qn=cvt(ing.qtd,ing.un||ins.unidade,ins.unidade)*(+f.qtd);const es=estoqueInsumoFn(ing.iid);return{nome:ins.nome,un:ins.unidade,qn,es,ok:es>=qn};}).filter(Boolean):[];
   const custoProd=fcAt?fcAt.custo*(+f.qtd||0):0;
   function registrar(){if(!f.fichaId)return alert("Selecione o produto.");if(!f.qtd||+f.qtd<=0)return alert("Informe a quantidade.");const insuf=nec.filter(n=>!n.ok);if(insuf.length&&!window.confirm(`⚠️ Estoque insuficiente:\n${insuf.map(n=>`• ${n.nome}: precisa ${n.qn.toFixed(3)}, tem ${n.es.toFixed(3)}`).join("\n")}\n\nRegistrar mesmo assim?`))return;setProducoes([...producoes,{id:uid(),fichaId:f.fichaId,qtdProduzida:+f.qtd,data:f.data,custoUnit:fcAt?.custo||0}]);setF({...blank,data:f.data});}
   function remover(id){if(window.confirm("Remover?"))setProducoes(producoes.filter(p=>p.id!==id));}
+
+  function salvarAjusteProd(){
+    if(!editandoProd||editandoProd.valor==="")return;
+    const estoqueAtual=estoqueProdutoFn(editandoProd.fichaId);
+    const novoEstoque=+editandoProd.valor;
+    const delta=novoEstoque-estoqueAtual;
+    if(Math.abs(delta)<0.001){setEditandoProd(null);return;}
+    const fc=fichasCalc.find(p=>p.id===editandoProd.fichaId);
+    setProducoes([...producoes,{
+      id:uid(),fichaId:editandoProd.fichaId,
+      qtdProduzida:+delta.toFixed(0), // pode ser negativo
+      data:today,custoUnit:fc?.custo||0,
+      tipo:"ajuste",
+    }]);
+    setEditandoProd(null);
+  }
   return(<>
     <Card title="🏭 Registrar Lote de Produção">
       {!fichasCalc.length?<p style={{color:"#d97706",background:"rgba(245,158,11,.1)",padding:10,borderRadius:8,fontSize:13}}>⚠️ Cadastre fichas técnicas antes.</p>:(
@@ -628,18 +768,47 @@ function ProducaoTab({producoes,setProducoes,fichasCalc,idef,estoqueInsumoFn,est
       )}
     </Card>
     <Card title="🛍️ Estoque de Produtos Acabados">
+      <p style={{margin:"0 0 12px",fontSize:13,color:"var(--text3)"}}>Use ✏️ para corrigir a quantidade em estoque após contagem física.</p>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Produto","Custo Médio/un","Total Produzido","Total Vendido","Em Estoque","Valor em Estoque","Status"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Produto","Custo Médio/un","Total Produzido","Total Vendido","Em Estoque","Valor em Estoque","Status",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!fichasCalc.length&&<tr><td colSpan={7} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum produto cadastrado.</td></tr>}
-          {fichasCalc.map(fc=>{const prod=producoes.filter(p=>p.fichaId===fc.id).reduce((s,p)=>s+p.qtdProduzida,0);const estoqP=estoqueProdutoFn(fc.id),vendTotal=prod-estoqP;const neg=estoqP<0,zero=estoqP===0;return(
-            <tr key={fc.id} style={{background:neg?"rgba(239,68,68,.07)":zero?"var(--card2)":"transparent"}}>
-              <td style={{...S.td,fontWeight:600}}>{fc.nome}</td><td style={{...S.td,color:"#7c3aed",fontWeight:700}}>{fR(fc.custo)}</td><td style={S.td}>{prod} un</td><td style={S.td}>{vendTotal} un</td>
-              <td style={{...S.td,fontWeight:700,fontSize:15,color:neg?"#ef4444":zero?"var(--text4)":"#059669"}}>{estoqP} un</td>
-              <td style={{...S.td,fontWeight:600}}>{fR(Math.max(0,estoqP)*fc.custo)}</td>
-              <td style={S.td}>{neg?<Pill label="❌ Negativo" color="#991b1b" bg="#fee2e2"/>:zero?<Pill label="⚪ Zerado" color="#6b7280" bg="#f3f4f6"/>:<Pill label="✅ Em estoque" color="#065f46" bg="#d1fae5"/>}</td>
-            </tr>
-          );})}
+          {!fichasCalc.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum produto cadastrado.</td></tr>}
+          {fichasCalc.map(fc=>{
+            const prod=producoes.filter(p=>p.fichaId===fc.id).reduce((s,p)=>s+p.qtdProduzida,0);
+            const estoqP=estoqueProdutoFn(fc.id),vendTotal=prod-estoqP;
+            const neg=estoqP<0,zero=estoqP===0;
+            const isEd=editandoProd?.fichaId===fc.id;
+            return(
+              <tr key={fc.id} style={{background:isEd?"rgba(124,58,237,.05)":neg?"rgba(239,68,68,.07)":zero?"var(--card2)":"transparent"}}>
+                <td style={{...S.td,fontWeight:600}}>{fc.nome}</td>
+                <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>{fR(fc.custo)}</td>
+                <td style={S.td}>{prod} un</td>
+                <td style={S.td}>{vendTotal} un</td>
+                <td style={S.td}>
+                  {isEd?(
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <input type="number" step="1" value={editandoProd.valor}
+                        onChange={e=>setEditandoProd({...editandoProd,valor:e.target.value})}
+                        style={{...S.inp,width:80,padding:"4px 8px",fontWeight:700,color:"#7c3aed"}}
+                        autoFocus
+                        onKeyDown={e=>{if(e.key==="Enter")salvarAjusteProd();if(e.key==="Escape")setEditandoProd(null);}}
+                      />
+                      <span style={{fontSize:12,color:"var(--text3)"}}>un</span>
+                      <button style={{...S.bsm,background:"#dcfce7",color:"#065f46",border:"1px solid #86efac"}} onClick={salvarAjusteProd}>✓</button>
+                      <button style={S.bsm} onClick={()=>setEditandoProd(null)}>✕</button>
+                    </div>
+                  ):(
+                    <span style={{fontWeight:700,fontSize:15,color:neg?"#ef4444":zero?"var(--text4)":"#059669"}}>{estoqP} un</span>
+                  )}
+                </td>
+                <td style={{...S.td,fontWeight:600}}>{fR(Math.max(0,estoqP)*fc.custo)}</td>
+                <td style={S.td}>{neg?<Pill label="❌ Negativo" color="#991b1b" bg="#fee2e2"/>:zero?<Pill label="⚪ Zerado" color="#6b7280" bg="#f3f4f6"/>:<Pill label="✅ Em estoque" color="#065f46" bg="#d1fae5"/>}</td>
+                <td style={S.td}>
+                  {!isEd&&<button style={{...S.bsm,color:"#7c3aed"}} onClick={()=>setEditandoProd({fichaId:fc.id,valor:String(estoqP)})} title="Ajustar estoque">✏️</button>}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Card>
@@ -659,7 +828,7 @@ function ProducaoTab({producoes,setProducoes,fichasCalc,idef,estoqueInsumoFn,est
 
 function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,estoqueProdutoFn,canConfirmar,idef,custMedioFn}){
   const today=new Date().toISOString().slice(0,10);
-  const blankOrder={data:today,canal:"Presencial",obs:"",cliente:"",usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"",usaTele:false,teleValor:""};
+  const blankOrder={data:today,canal:"Presencial",obs:"",cliente:"",usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"",usaTele:false,teleValor:"",pagamento:"Dinheiro"};
   const blankItem={fichaId:"",qtd:""};
   const [f,setF]=useState(blankOrder);
   const [nItem,setNItem]=useState(blankItem);
@@ -690,10 +859,10 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
       id:uid(),items:carrinho,data:f.data,canal:f.canal,obs:f.obs,cliente:f.cliente.trim(),status:"Pendente",
       usaEmbalagem:f.usaEmbalagem,embQtd:f.usaEmbalagem?+f.embQtd:0,embInsumoId:f.embInsumoId,embalagemCusto:custoEmb,
       usaTele:f.usaTele,teleValor:f.usaTele?+f.teleValor||0:0,
-      desconto:+f.desconto||0,
+      desconto:+f.desconto||0,pagamento:f.pagamento,
     }]);
     setCarrinho([]);
-    setF({...blankOrder,data:f.data,canal:f.canal});
+    setF({...blankOrder,data:f.data,canal:f.canal,pagamento:f.pagamento});
   }
 
   function confirmar(pedido){
@@ -712,6 +881,7 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
       id:uid(),items,data:pedido.data,pedidoId:pedido.id,
       embalagemCusto:pedido.embalagemCusto||0,embQtd:pedido.embQtd||0,embInsumoId:pedido.embInsumoId||"",
       desconto:pedido.desconto||0,teleValor:pedido.teleValor||0,
+      pagamento:pedido.pagamento||"—",
     }]);
   }
   function cancelar(id){if(window.confirm("Cancelar?"))setPedidos(pedidos.map(p=>p.id===id?{...p,status:"Cancelado"}:p));}
@@ -778,11 +948,17 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
         )}
       </div>
 
-      {/* ── Data / Canal / Cliente ── */}
-      <G cols="1fr 1fr 1fr" gap={10} mb={10}>
+      {/* ── Data / Canal / Cliente / Pagamento ── */}
+      <G cols="1fr 1fr 1fr 1fr" gap={10} mb={10}>
         <div><Lbl s="Data"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
         <div><Lbl s="Canal"/><select style={S.inp} value={f.canal} onChange={e=>setF({...f,canal:e.target.value})}>{CANAIS.map(c=><option key={c}>{c}</option>)}</select></div>
         <div><Lbl s="👤 Cliente (opcional)"/><input style={S.inp} placeholder="Ex: João Silva" value={f.cliente} onChange={e=>setF({...f,cliente:e.target.value})}/></div>
+        <div>
+          <Lbl s="💳 Meio de pagamento"/>
+          <select style={S.inp} value={f.pagamento} onChange={e=>setF({...f,pagamento:e.target.value})}>
+            {PAGAMENTOS_ENTRADA.map(p=><option key={p}>{p}</option>)}
+          </select>
+        </div>
       </G>
 
       {/* ── Embalagem · Tele · Desconto ── */}
@@ -846,9 +1022,9 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
 
     <Card title={`📋 Pedidos (${pedidos.length})`} right={<div style={{display:"flex",gap:6}}>{["Todos","Pendente","Confirmado","Cancelado"].map(s=><button key={s} onClick={()=>setFiltro(s)} style={{...S.bsm,background:filtro===s?"#7c3aed":"var(--bsm-bg)",color:filtro===s?"white":"#7c3aed",fontWeight:filtro===s?700:500}}>{s}</button>)}</div>}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Data","Cliente","Itens do Pedido","Canal","Valor Total","📦","🛵","🏷️","Obs.","Status","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Data","Cliente","Itens do Pedido","Canal","💳 Pagamento","Valor Total","📦","🛵","🏷️","Obs.","Status","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!lista.length&&<tr><td colSpan={11} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhum pedido {filtro!=="Todos"?`com status "${filtro}"`:"registrado"}.</td></tr>}
+          {!lista.length&&<tr><td colSpan={12} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhum pedido {filtro!=="Todos"?`com status "${filtro}"`:"registrado"}.</td></tr>}
           {[...lista].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(p=>{
             const its=getItems(p);
             const recTotal=its.reduce((s,i)=>s+i.qtd*getPreco(i.fichaId),0);
@@ -871,6 +1047,7 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
                   })}
                 </td>
                 <td style={S.td}><span style={{background:"var(--accent-soft)",color:"var(--accent-soft-c)",padding:"2px 8px",borderRadius:20,fontSize:12}}>{p.canal}</span></td>
+                <td style={S.td}>{(()=>{const pc=PAG_CORES[p.pagamento];return p.pagamento?<span style={{background:pc?.bg||"var(--card2)",color:pc?.c||"var(--text3)",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{p.pagamento}</span>:<span style={{color:"var(--text4)",fontSize:12}}>—</span>;})()}</td>
                 <td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>{fR(recTotal)}</td>
                 <td style={S.td}>{(p.embQtd||0)>0?<span style={{fontSize:12,color:"#d97706",fontWeight:600}}>📦 {p.embQtd}{i2&&<><br/><span style={{fontSize:10,color:"var(--text4)"}}>{fR(p.embalagemCusto||0)}</span></>}</span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
                 <td style={S.td}>{(p.teleValor||0)>0?<span style={{color:"#059669",fontWeight:600}}>🛵 {fR(p.teleValor)}</span>:<span style={{color:"var(--border3)"}}>—</span>}</td>
@@ -892,169 +1069,18 @@ function PedidosTab({pedidos,setPedidos,fichasCalc,getPreco,setVendas,vendas,est
   </>);
 }
 
-function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,custMedioFn}){
-  const today=new Date().toISOString().slice(0,10);
-  const blankOrder={data:today,usaEmbalagem:false,embQtd:"",embInsumoId:"",desconto:"",usaTele:false,teleValor:"",pagamento:"Dinheiro"};
-  const blankItem={fichaId:"",qtd:""};
-  const [f,setF]=useState(blankOrder);
-  const [nItem,setNItem]=useState(blankItem);
-  const [carrinho,setCarrinho]=useState([]);
-
-  const insEmb=idef.filter(i=>i.nome.toLowerCase().includes("embalagem")||i.nome.toLowerCase().includes("sacola")||i.nome.toLowerCase().includes("caixa"));
-  const cmEmb=f.embInsumoId?custMedioFn(f.embInsumoId):0;
-  const custoEmb=f.usaEmbalagem&&+f.embQtd>0&&cmEmb>0?cmEmb*(+f.embQtd):0;
-  const totalCarrinho=carrinho.reduce((s,i)=>s+i.qtd*getPreco(i.fichaId),0);
-
+function VendasTab({vendas,setVendas,fichasCalc,getPreco,idef}){
   const totRec=vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>ss+i.qtd*getPreco(i.fichaId),0),0);
   const totTele=vendas.reduce((s,v)=>s+(v.teleValor||0),0);
   const totDesc=vendas.reduce((s,v)=>s+(v.desconto||0),0);
   const totEmb=vendas.reduce((s,v)=>s+(v.embalagemCusto||0),0);
-
-  function addItem(){
-    if(!nItem.fichaId)return alert("Selecione o produto.");
-    if(!nItem.qtd||+nItem.qtd<=0)return alert("Informe a quantidade.");
-    const ex=carrinho.find(i=>i.fichaId===nItem.fichaId);
-    if(ex){setCarrinho(carrinho.map(i=>i.fichaId===nItem.fichaId?{...i,qtd:i.qtd+(+nItem.qtd)}:i));}
-    else{setCarrinho([...carrinho,{id:uid(),fichaId:nItem.fichaId,qtd:+nItem.qtd}]);}
-    setNItem(blankItem);
-  }
-  function removeItem(id){setCarrinho(carrinho.filter(i=>i.id!==id));}
-  function updateItemQtd(id,val){if(+val>0)setCarrinho(carrinho.map(i=>i.id===id?{...i,qtd:+val}:i));}
-
-  function add(){
-    if(!carrinho.length)return alert("Adicione ao menos um produto.");
-    if(f.usaEmbalagem&&!f.embInsumoId)return alert("Selecione o insumo de embalagem.");
-    if(f.usaEmbalagem&&(!f.embQtd||+f.embQtd<=0))return alert("Informe a quantidade de embalagens.");
-    let bloqueou=false;
-    for(const item of carrinho){
-      const es=estoqueProdutoFn(item.fichaId);
-      if(es<item.qtd){
-        const fc=fichasCalc.find(f=>f.id===item.fichaId);
-        if(!window.confirm(`⚠️ Estoque insuficiente para "${fc?.nome||"?"}":\n  Tem: ${es} un  |  Precisa: ${item.qtd} un\n\nVender assim mesmo?`)){bloqueou=true;break;}
-      }
-    }
-    if(bloqueou)return;
-    setVendas([...vendas,{
-      id:uid(),items:carrinho,data:f.data,
-      embalagemCusto:custoEmb,embQtd:f.usaEmbalagem?+f.embQtd:0,embInsumoId:f.embInsumoId,
-      desconto:+f.desconto||0,teleValor:f.usaTele?+f.teleValor||0:0,
-      pagamento:f.pagamento,
-    }]);
-    setCarrinho([]);
-    setF({...blankOrder,data:f.data,pagamento:f.pagamento});
-  }
   function remover(id){if(window.confirm("Remover venda?"))setVendas(vendas.filter(v=>v.id!==id));}
 
   return(<>
-    <Card title="🛒 Registrar Venda">
-      {!fichasCalc.length?<p style={{color:"#d97706",background:"rgba(245,158,11,.1)",padding:10,borderRadius:8,fontSize:13}}>⚠️ Cadastre produtos e produção primeiro.</p>:(
-        <>
-          {/* Carrinho */}
-          <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:12}}>
-            <p style={{margin:"0 0 10px",fontSize:13,fontWeight:700,color:"#7c3aed"}}>🛒 Itens da Venda</p>
-            <G cols="3fr 1fr auto" mb={carrinho.length>0?12:0}>
-              <div><Lbl s="Produto"/><select style={S.inp} value={nItem.fichaId} onChange={e=>setNItem({...nItem,fichaId:e.target.value})}><option value="">Selecione...</option>{fichasCalc.map(p=><option key={p.id} value={p.id}>{p.nome} — {fR(getPreco(p.id))}/un · Est: {estoqueProdutoFn(p.id)} un</option>)}</select></div>
-              <div><Lbl s="Quantidade"/><input style={S.inp} type="number" min="1" step="1" placeholder="Ex: 10" value={nItem.qtd} onChange={e=>setNItem({...nItem,qtd:e.target.value})} onKeyDown={e=>e.key==="Enter"&&addItem()}/></div>
-              <div style={{display:"flex",alignItems:"flex-end"}}><button style={S.btn} onClick={addItem}>+ Adicionar</button></div>
-            </G>
-            {carrinho.length>0?(
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                <thead><tr>{["Produto","Estoque","Qtd.","Preço/un","Subtotal",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {carrinho.map(item=>{
-                    const fc=fichasCalc.find(f=>f.id===item.fichaId);
-                    const pr=getPreco(item.fichaId);
-                    const es=estoqueProdutoFn(item.fichaId);
-                    const insuf=es<item.qtd;
-                    return(
-                      <tr key={item.id} style={{background:insuf?"rgba(239,68,68,.05)":"transparent"}}>
-                        <td style={{...S.td,fontWeight:600,color:insuf?"#ef4444":"var(--text)"}}>
-                          {fc?.nome||"—"}{insuf&&<span style={{fontSize:11,color:"#ef4444",marginLeft:6,fontWeight:400}}>⚠️ insuf.</span>}
-                        </td>
-                        <td style={{...S.td,color:insuf?"#ef4444":"#059669",fontWeight:600}}>{es} un</td>
-                        <td style={S.td}>
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <input type="number" min="1" step="1" value={item.qtd}
-                              onChange={e=>updateItemQtd(item.id,e.target.value)}
-                              style={{...S.inp,width:72,padding:"3px 8px",textAlign:"center"}}/>
-                            <span style={{color:"var(--text3)",fontSize:12}}>un</span>
-                          </div>
-                        </td>
-                        <td style={S.td}>{fR(pr)}</td>
-                        <td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>{fR(pr*item.qtd)}</td>
-                        <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>removeItem(item.id)}>🗑️</button></td>
-                      </tr>
-                    );
-                  })}
-                  <tr style={{background:"rgba(124,58,237,.06)"}}>
-                    <td colSpan={4} style={{...S.td,fontWeight:700,textAlign:"right",color:"#7c3aed"}}>Total dos produtos:</td>
-                    <td style={{...S.td,fontWeight:700,color:"#7c3aed",fontSize:15}}>{fR(totalCarrinho)}</td>
-                    <td style={S.td}/>
-                  </tr>
-                </tbody>
-              </table>
-            ):(
-              <p style={{margin:"8px 0 0",fontSize:13,color:"var(--text4)",textAlign:"center",padding:"12px 0"}}>Nenhum item adicionado. Use o seletor acima para montar a venda.</p>
-            )}
-          </div>
-
-          {/* Data + Pagamento */}
-          <G cols="1fr 1fr" gap={10} mb={10}>
-            <div><Lbl s="Data da venda"/><input style={S.inp} type="date" value={f.data} onChange={e=>setF({...f,data:e.target.value})}/></div>
-            <div>
-              <Lbl s="💳 Meio de pagamento"/>
-              <select style={S.inp} value={f.pagamento} onChange={e=>setF({...f,pagamento:e.target.value})}>
-                {PAGAMENTOS_ENTRADA.map(p=><option key={p}>{p}</option>)}
-              </select>
-            </div>
-          </G>
-          <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:10}}>
-            <G cols="1fr 1fr 1fr" gap={16} mb={0}>
-              <div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                  <input type="checkbox" id="usaEmb" checked={f.usaEmbalagem} onChange={e=>setF({...f,usaEmbalagem:e.target.checked,embQtd:"",embInsumoId:""})} style={{width:16,height:16,accentColor:"#7c3aed",cursor:"pointer"}}/>
-                  <label htmlFor="usaEmb" style={{fontSize:14,fontWeight:600,color:"#7c3aed",cursor:"pointer"}}>📦 Usar embalagem?</label>
-                </div>
-                {f.usaEmbalagem&&(<G cols="1fr 1fr" gap={8} mb={0}>
-                  <div><Lbl s="Insumo de embalagem"/><select style={S.inp} value={f.embInsumoId} onChange={e=>setF({...f,embInsumoId:e.target.value})}><option value="">Selecione...</option>{(insEmb.length?insEmb:idef).map(i=>{const c=custMedioFn(i.id);return<option key={i.id} value={i.id}>{i.nome} — {c>0?fR(c):"sem compras"}/{i.unidade}</option>;})}</select></div>
-                  <div><Lbl s="Qtd. de embalagens"/><input style={S.inp} type="number" min="1" step="1" placeholder="Ex: 2" value={f.embQtd} onChange={e=>setF({...f,embQtd:e.target.value})}/></div>
-                </G>)}
-                {f.usaEmbalagem&&f.embInsumoId&&+f.embQtd>0&&cmEmb>0&&<div style={{marginTop:8,fontSize:13,background:"rgba(245,158,11,.1)",color:"#d97706",padding:"6px 12px",borderRadius:8}}>📦 {f.embQtd} un × {fR(cmEmb)} = <strong>{fR(custoEmb)}</strong></div>}
-                {f.usaEmbalagem&&f.embInsumoId&&cmEmb===0&&<p style={{fontSize:12,color:"#ef4444",marginTop:6}}>⚠️ Sem custo médio.</p>}
-              </div>
-              <div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                  <input type="checkbox" id="usaTele" checked={f.usaTele} onChange={e=>setF({...f,usaTele:e.target.checked,teleValor:""})} style={{width:16,height:16,accentColor:"#059669",cursor:"pointer"}}/>
-                  <label htmlFor="usaTele" style={{fontSize:14,fontWeight:600,color:"#059669",cursor:"pointer"}}>🛵 Tele entrega?</label>
-                </div>
-                {f.usaTele&&(<><Lbl s="Valor da tele entrega (R$)"/><input style={S.inp} type="number" step="0.01" min="0" placeholder="Ex: 5,00" value={f.teleValor} onChange={e=>setF({...f,teleValor:e.target.value})}/>{+f.teleValor>0&&<div style={{marginTop:8,fontSize:13,background:"rgba(5,150,105,.1)",color:"#059669",padding:"6px 12px",borderRadius:8}}>🛵 +{fR(+f.teleValor)} por pedido</div>}</>)}
-              </div>
-              <div>
-                <Lbl s="🏷️ Desconto (R$)"/>
-                <input style={S.inp} type="number" step="0.01" min="0" placeholder="0,00" value={f.desconto} onChange={e=>setF({...f,desconto:e.target.value})}/>
-                {+f.desconto>0&&<p style={{fontSize:12,color:"#ef4444",marginTop:6}}>Desconto de <strong>{fR(+f.desconto)}</strong></p>}
-              </div>
-            </G>
-          </div>
-
-          {carrinho.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
-            <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"5px 12px",borderRadius:8}}>🛒 {carrinho.length} item(s): <strong>{fR(totalCarrinho)}</strong></span>
-            {f.usaTele&&+f.teleValor>0&&<span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.1)",padding:"5px 12px",borderRadius:8}}>🛵 <strong>+{fR(+f.teleValor)}</strong></span>}
-            {custoEmb>0&&<span style={{fontSize:13,color:"#d97706",background:"rgba(245,158,11,.1)",padding:"5px 12px",borderRadius:8}}>📦 <strong>-{fR(custoEmb)}</strong></span>}
-            {+f.desconto>0&&<span style={{fontSize:13,color:"#ef4444",background:"rgba(239,68,68,.1)",padding:"5px 12px",borderRadius:8}}>🏷️ <strong>-{fR(+f.desconto)}</strong></span>}
-            <span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.12)",padding:"5px 14px",borderRadius:8,fontWeight:700,border:"1px solid #6ee7b7"}}>
-              Total: <strong>{fR(totalCarrinho+(f.usaTele?+f.teleValor||0:0)-custoEmb-(+f.desconto||0))}</strong>
-            </span>
-          </div>}
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-            {carrinho.length>0&&<button style={S.btn2} onClick={()=>setCarrinho([])}>🗑️ Limpar itens</button>}
-            <button style={{...S.btn,opacity:carrinho.length===0?.45:1,cursor:carrinho.length===0?"not-allowed":"pointer"}} onClick={add} disabled={carrinho.length===0}>
-              + Registrar Venda{carrinho.length>0?` (${carrinho.length} item${carrinho.length!==1?"s":""})`:""}
-            </button>
-          </div>
-        </>
-      )}
-    </Card>
+    <div style={{background:"rgba(124,58,237,.08)",border:"1px solid var(--border2)",borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#7c3aed",display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:18}}>ℹ️</span>
+      <span>As vendas são geradas automaticamente ao <strong>confirmar um pedido</strong> na aba <strong>📝 Pedidos</strong>.</span>
+    </div>
 
     <G cols="repeat(5,1fr)" gap={12} mb={20}>
       <KPI label="📦 Total vendido" value={vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>ss+i.qtd,0),0)+" un"} color="#7c3aed"/>
@@ -1064,11 +1090,11 @@ function VendasTab({vendas,setVendas,fichasCalc,getPreco,estoqueProdutoFn,idef,c
       <KPI label="📦 Embalagens" value={fR(totEmb)} color="#d97706"/>
     </G>
 
-    <Card title={`📋 Vendas (${vendas.length})`}>
+    <Card title={`📋 Histórico de Vendas (${vendas.length})`}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
         <thead><tr>{["Data","Itens Vendidos","Receita","💳 Pagamento","🛵 Tele","Embalagem","Desconto","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!vendas.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhuma venda registrada.</td></tr>}
+          {!vendas.length&&<tr><td colSpan={8} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhuma venda registrada. Confirme pedidos na aba 📝 Pedidos.</td></tr>}
           {vendas.map(v=>{
             const its=getItems(v);
             const recV=its.reduce((s,i)=>s+i.qtd*getPreco(i.fichaId),0);
@@ -2203,12 +2229,12 @@ export default function App(){
         <div style={{flex:1,padding:"24px 24px 48px"}}>
           {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
           {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef} custMedioFn={custMedioFn}/>}
-          {tab===2  && <EstoqueTab idefComCusto={idefComCusto}/>}
+          {tab===2  && <EstoqueTab idefComCusto={idefComCusto} entradas={entradas} setEntradas={setEntradas}/>}
           {tab===3  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn}/>}
           {tab===4  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
           {tab===5  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
           {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido} idef={idef} custMedioFn={custMedioFn}/>}
-          {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} estoqueProdutoFn={estoqueProdutoFn} idef={idef} custMedioFn={custMedioFn}/>}
+          {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} idef={idef}/>}
           {tab===8  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
           {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
           {tab===10 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
