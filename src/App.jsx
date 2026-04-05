@@ -32,9 +32,9 @@ const flatEntradas = ents => ents.flatMap(e=>
 const ROLES = {Admin:"Admin",Comprador:"Comprador",Vendedor:"Vendedor"};
 const ROLE_COLORS = {Admin:{bg:"#ede9fe",color:"#5b21b6"},Comprador:{bg:"#dbeafe",color:"#1e40af"},Vendedor:{bg:"#dcfce7",color:"#166534"}};
 const PERMS = {
-  Admin:     {tabs:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14],editPrecos:true, canConfirmarPedido:true},
-  Comprador: {tabs:[1,2,5,6,7,12,13,14],                 editPrecos:false,canConfirmarPedido:true},
-  Vendedor:  {tabs:[4,6,13],                              editPrecos:false,canConfirmarPedido:false},
+  Admin:     {tabs:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],editPrecos:true, canConfirmarPedido:true},
+  Comprador: {tabs:[1,2,3,6,7,8,13,14,15],                  editPrecos:false,canConfirmarPedido:true},
+  Vendedor:  {tabs:[5,7,14],                                 editPrecos:false,canConfirmarPedido:false},
 };
 const canTab = (role,idx) => PERMS[role]?.tabs.includes(idx)??false;
 
@@ -521,6 +521,261 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
   </>);
 }
 
+// ── MANUFATURA DE INSUMOS ──────────────────────────────────────────────────
+function ManufaturaTab({receitasManuf,setReceitasManuf,lotesManuf,setLotesManuf,idef,entradas,setEntradas,estoqueInsumoFn,custMedioFn}){
+  const today=new Date().toISOString().slice(0,10);
+
+  // ── Receitas ──
+  const blankR={insumoId:"",qtdProduzida:"",ings:[]};
+  const blankIng={iid:"",qtd:"",un:""};
+  const [r,setR]=useState(blankR);
+  const [nIng,setNIng]=useState(blankIng);
+  const [eid,setEid]=useState(null);
+
+  const insOut=idef.find(i=>i.id===r.insumoId);
+  const insIngAt=idef.find(i=>i.id===nIng.iid);
+  const unOpts=insIngAt?compatUnits(insIngAt.unidade):[];
+  const idsManuOut=new Set(receitasManuf.map(rc=>rc.insumoId));
+
+  function addIng(){
+    if(!nIng.iid||!nIng.qtd||+nIng.qtd<=0)return alert("Selecione o insumo e informe a quantidade.");
+    if(nIng.iid===r.insumoId)return alert("O insumo produzido não pode ser ingrediente de si mesmo.");
+    setR({...r,ings:[...r.ings,{id:uid(),iid:nIng.iid,qtd:+nIng.qtd,un:nIng.un}]});
+    setNIng(blankIng);
+  }
+  function salvarReceita(){
+    if(!r.insumoId)return alert("Selecione o insumo que será produzido.");
+    if(!r.qtdProduzida||+r.qtdProduzida<=0)return alert("Informe a quantidade produzida por lote.");
+    if(!r.ings.length)return alert("Adicione ao menos um insumo a ser consumido.");
+    const it={id:eid||uid(),insumoId:r.insumoId,qtdProduzida:+r.qtdProduzida,ings:r.ings};
+    setReceitasManuf(eid?receitasManuf.map(rc=>rc.id===eid?it:rc):[...receitasManuf,it]);
+    setR(blankR);setNIng(blankIng);setEid(null);
+  }
+  function editarReceita(rc){setR({insumoId:rc.insumoId,qtdProduzida:rc.qtdProduzida,ings:rc.ings});setEid(rc.id);}
+  function removerReceita(id){if(window.confirm("Remover receita?"))setReceitasManuf(receitasManuf.filter(rc=>rc.id!==id));}
+
+  // custo de um ingrediente baseado no CM atual
+  function custoIng(ing){const ins=idef.find(i=>i.id===ing.iid);if(!ins)return 0;return custMedioFn(ing.iid)*cvt(ing.qtd,ing.un||ins.unidade,ins.unidade);}
+  const custoReceita=r.ings.reduce((s,i)=>s+custoIng(i),0);
+  const custoUnitR=+r.qtdProduzida>0?custoReceita/+r.qtdProduzida:0;
+
+  // ── Lotes ──
+  const [sel,setSel]=useState({receitaId:"",mult:"1",data:today});
+  const recAt=receitasManuf.find(rc=>rc.id===sel.receitaId);
+  const mult=+sel.mult||1;
+
+  const nec=recAt?(recAt.ings||[]).map(ing=>{
+    const ins=idef.find(i=>i.id===ing.iid);
+    if(!ins)return null;
+    const qn=cvt(ing.qtd,ing.un||ins.unidade,ins.unidade)*mult;
+    const es=estoqueInsumoFn(ing.iid);
+    return{nome:ins.nome,un:ins.unidade,iid:ing.iid,qn,es,ok:es>=qn};
+  }).filter(Boolean):[];
+
+  const qtdProdLote=recAt?recAt.qtdProduzida*mult:0;
+  const custoLote=recAt?(recAt.ings||[]).reduce((s,ing)=>{
+    const ins=idef.find(i=>i.id===ing.iid);
+    if(!ins)return s;
+    return s+custMedioFn(ing.iid)*cvt(ing.qtd,ing.un||ins.unidade,ins.unidade)*mult;
+  },0):0;
+  const custoUnitLote=qtdProdLote>0?custoLote/qtdProdLote:0;
+  const insOut2=recAt?idef.find(i=>i.id===recAt.insumoId):null;
+
+  function registrarLote(){
+    if(!recAt)return alert("Selecione uma receita.");
+    if(mult<=0)return alert("Informe o multiplicador.");
+    const insuf=nec.filter(n=>!n.ok);
+    if(insuf.length&&!window.confirm(`⚠️ Estoque insuficiente:\n${insuf.map(n=>`• ${n.nome}: precisa ${n.qn.toFixed(3)}, tem ${n.es.toFixed(3)}`).join("\n")}\n\nRegistrar mesmo assim?`))return;
+    const loteId=uid();
+    // Gera entrada para o insumo produzido (adiciona ao seu estoque)
+    setEntradas([...entradas,{
+      id:uid(),insumoId:recAt.insumoId,
+      qtd:+qtdProdLote.toFixed(6),
+      custoTotal:+custoLote.toFixed(4),
+      data:sel.data,
+      tipo:"manufatura",
+      loteManufId:loteId,
+      pagamento:"—",
+    }]);
+    // Registra o lote (para controlar consumo das matérias-primas)
+    setLotesManuf([...lotesManuf,{
+      id:loteId,
+      receitaId:recAt.id,
+      mult,
+      qtdProduzida:+qtdProdLote.toFixed(6),
+      data:sel.data,
+      custoUnit:+custoUnitLote.toFixed(4),
+      ings:recAt.ings.map(ing=>{
+        const ins=idef.find(i=>i.id===ing.iid);
+        return{iid:ing.iid,qtd:cvt(ing.qtd,ing.un||ins?.unidade,ins?.unidade)*mult,un:ins?.unidade};
+      }),
+    }]);
+    setSel({...sel,mult:"1"});
+  }
+  function removerLote(id){
+    if(!window.confirm("Remover este lote? O estoque gerado e o consumo de matérias-primas serão revertidos."))return;
+    const lote=lotesManuf.find(l=>l.id===id);
+    if(lote){
+      // Remove a entrada que foi criada para o insumo manufaturado
+      setEntradas(entradas.filter(e=>e.loteManufId!==id));
+    }
+    setLotesManuf(lotesManuf.filter(l=>l.id!==id));
+  }
+
+  return(<>
+    {/* ── Receitas de Manufatura ── */}
+    <Card title={eid?"✏️ Editar Receita de Manufatura":"🔧 Nova Receita de Manufatura"}>
+      <p style={{margin:"0 0 14px",fontSize:13,color:"var(--text3)"}}>
+        Defina quais <strong>insumos comprados</strong> são consumidos e qual <strong>insumo manufaturado</strong> é produzido. O CMV do insumo produzido será calculado automaticamente pelo custo das matérias-primas.
+      </p>
+      <G cols="2fr 1fr" gap={10} mb={12}>
+        <div>
+          <Lbl s="Insumo produzido *"/>
+          <select style={S.inp} value={r.insumoId} onChange={e=>setR({...r,insumoId:e.target.value,ings:[]})}>
+            <option value="">Selecione o insumo que será fabricado...</option>
+            {idef.map(i=><option key={i.id} value={i.id}>{i.nome} ({i.unidade}){idsManuOut.has(i.id)&&!eid?" — já tem receita":""}</option>)}
+          </select>
+        </div>
+        <div>
+          <Lbl s={`Qtd. produzida por lote${insOut?" ("+insOut.unidade+")":""} *`}/>
+          <input style={S.inp} type="number" step="0.001" min="0.001" placeholder="Ex: 1" value={r.qtdProduzida} onChange={e=>setR({...r,qtdProduzida:e.target.value})}/>
+          {custoUnitR>0&&insOut&&<div style={{marginTop:6,fontSize:12,color:"#7c3aed",background:"var(--accent-soft)",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>CMV/lote: <strong>{fR(custoReceita)}</strong> → <strong>{fR(custoUnitR)}/{insOut.unidade}</strong></div>}
+        </div>
+      </G>
+      {r.insumoId&&(
+        <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:12}}>
+          <p style={{margin:"0 0 10px",fontSize:13,fontWeight:700,color:"#7c3aed"}}>🧂 Matérias-primas consumidas</p>
+          <G cols="2.5fr 1fr 1fr auto" gap={8} mb={nIng.iid?8:0}>
+            <div><Lbl s="Insumo"/><select style={S.inp} value={nIng.iid} onChange={e=>{const ins=idef.find(i=>i.id===e.target.value);setNIng({iid:e.target.value,qtd:"",un:ins?ins.unidade:""});}}><option value="">Selecione...</option>{idef.filter(i=>i.id!==r.insumoId).map(i=>{const c=custMedioFn(i.id);return<option key={i.id} value={i.id}>{idsManuOut.has(i.id)?"🔧 ":""}{i.nome} ({i.unidade}){c>0?" — CM: "+fR(c)+"/"+i.unidade:" — sem CM"}</option>;})}</select></div>
+            <div><Lbl s="Quantidade"/><input style={S.inp} type="number" step="0.001" min="0" value={nIng.qtd} disabled={!nIng.iid} onChange={e=>setNIng({...nIng,qtd:e.target.value})}/></div>
+            <div><Lbl s="Unidade"/><select style={{...S.inp,background:!nIng.iid?"var(--card2)":"var(--inp)"}} value={nIng.un} disabled={!nIng.iid} onChange={e=>setNIng({...nIng,un:e.target.value})}><option value="">—</option>{unOpts.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
+            <div style={{display:"flex",alignItems:"flex-end"}}><button style={S.btn} onClick={addIng}>+ Add</button></div>
+          </G>
+          {r.ings.length>0&&(
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,marginTop:10}}>
+              <thead><tr>{["Insumo","Qtd.","Un.","CM","Custo",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {r.ings.map(ing=>{const i2=idef.find(i=>i.id===ing.iid);const c=custMedioFn(ing.iid);return(
+                  <tr key={ing.id}>
+                    <td style={{...S.td,fontWeight:600}}>{idsManuOut.has(ing.iid)&&<span style={{color:"#7c3aed",marginRight:4}}>🔧</span>}{i2?.nome||"—"}</td>
+                    <td style={S.td}>{ing.qtd}</td><td style={S.td}>{ing.un||i2?.unidade}</td>
+                    <td style={S.td}>{c>0?fR(c)+"/"+i2?.unidade:<span style={{color:"#ef4444",fontSize:11}}>Sem CM</span>}</td>
+                    <td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>{fR(custoIng(ing))}</td>
+                    <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>setR({...r,ings:r.ings.filter(i=>i.id!==ing.id)})}>🗑️</button></td>
+                  </tr>
+                );})}
+                <tr style={{background:"var(--card2)"}}><td colSpan={4} style={{...S.td,fontWeight:700,textAlign:"right",color:"#7c3aed"}}>Custo por lote:</td><td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>{fR(custoReceita)}</td><td/></tr>
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        {eid&&<button style={S.btn2} onClick={()=>{setR(blankR);setEid(null);}}>Cancelar</button>}
+        <button style={S.btn} onClick={salvarReceita}>{eid?"✓ Atualizar":"✓ Criar Receita"}</button>
+      </div>
+    </Card>
+
+    {/* Lista de receitas */}
+    {receitasManuf.length>0&&(
+      <Card title={`🗂️ Receitas cadastradas (${receitasManuf.length})`}>
+        {receitasManuf.map(rc=>{
+          const iOut=idef.find(i=>i.id===rc.insumoId);
+          const custoRc=(rc.ings||[]).reduce((s,ing)=>{const ins=idef.find(i=>i.id===ing.iid);if(!ins)return s;return s+custMedioFn(ing.iid)*cvt(ing.qtd,ing.un||ins.unidade,ins.unidade);},0);
+          const cuU=rc.qtdProduzida>0?custoRc/rc.qtdProduzida:0;
+          return(
+            <div key={rc.id} style={{border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                <div>
+                  <span style={{fontWeight:700,fontSize:15,color:"#7c3aed"}}>🔧 {iOut?.nome||"?"}</span>
+                  <span style={{fontSize:13,color:"var(--text3)",marginLeft:10}}>produz <strong>{rc.qtdProduzida} {iOut?.unidade}</strong>/lote</span>
+                  <span style={{fontSize:13,color:"#059669",marginLeft:10}}>→ CMV: <strong>{fR(cuU)}/{iOut?.unidade}</strong></span>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button style={S.bsm} onClick={()=>editarReceita(rc)}>✏️</button>
+                  <button style={{...S.bsm,color:"#ef4444"}} onClick={()=>removerReceita(rc.id)}>🗑️</button>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {(rc.ings||[]).map(ing=>{const i2=idef.find(i=>i.id===ing.iid);return i2&&<span key={ing.id} style={{fontSize:12,background:"var(--card2)",color:"var(--text3)",padding:"2px 10px",borderRadius:20,border:"1px solid var(--border)"}}>{i2.nome}: {ing.qtd} {ing.un||i2.unidade}</span>;})}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+    )}
+
+    <hr style={{border:"none",borderTop:"2px solid var(--border3)",margin:"8px 0 20px"}}/>
+
+    {/* ── Registrar Lote ── */}
+    <Card title="🏭 Registrar Lote de Manufatura">
+      {!receitasManuf.length?(
+        <p style={{color:"#d97706",background:"rgba(245,158,11,.1)",padding:12,borderRadius:8,fontSize:13}}>⚠️ Cadastre ao menos uma receita de manufatura acima antes de registrar lotes.</p>
+      ):(
+        <>
+          <G cols="2fr 1fr 1fr auto" gap={10} mb={10}>
+            <div>
+              <Lbl s="Receita *"/>
+              <select style={S.inp} value={sel.receitaId} onChange={e=>setSel({...sel,receitaId:e.target.value})}>
+                <option value="">Selecione...</option>
+                {receitasManuf.map(rc=>{const iOut=idef.find(i=>i.id===rc.insumoId);return<option key={rc.id} value={rc.id}>🔧 {iOut?.nome||"?"} — rende {rc.qtdProduzida} {iOut?.unidade}/lote</option>;})}
+              </select>
+            </div>
+            <div>
+              <Lbl s="Multiplicador (lotes)"/>
+              <input style={S.inp} type="number" min="1" step="1" placeholder="Ex: 2" value={sel.mult} onChange={e=>setSel({...sel,mult:e.target.value})}/>
+            </div>
+            <div><Lbl s="Data"/><input style={S.inp} type="date" value={sel.data} onChange={e=>setSel({...sel,data:e.target.value})}/></div>
+            <div style={{display:"flex",alignItems:"flex-end"}}><button style={S.btn} onClick={registrarLote}>✓ Produzir</button></div>
+          </G>
+          {recAt&&mult>0&&(
+            <div style={{background:"var(--card2)",borderRadius:10,padding:14,marginBottom:10}}>
+              <p style={{margin:"0 0 10px",fontWeight:600,color:"#7c3aed",fontSize:13}}>📋 Consumo para {mult} lote{mult!==1?"s":""} de "{insOut2?.nome}":</p>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                {nec.map((n,i)=>(
+                  <div key={i} style={{background:n.ok?"rgba(5,150,105,.1)":"rgba(239,68,68,.1)",border:`1px solid ${n.ok?"#86efac":"#fca5a5"}`,borderRadius:8,padding:"8px 12px",fontSize:13}}>
+                    <strong>{n.nome}:</strong> {n.qn.toFixed(3)} {n.un}
+                    <span style={{fontSize:11,marginLeft:8,color:n.ok?"#059669":"#ef4444"}}>{n.ok?`✅ estoque: ${n.es.toFixed(3)}`:`❌ tem: ${n.es.toFixed(3)}`}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:"#059669",background:"rgba(5,150,105,.08)",padding:"5px 12px",borderRadius:8}}>📦 Produz: <strong>{qtdProdLote.toFixed(3)} {insOut2?.unidade}</strong></span>
+                <span style={{fontSize:13,color:"#1d4ed8",background:"rgba(29,78,216,.07)",padding:"5px 12px",borderRadius:8}}>💰 Custo total: <strong>{fR(custoLote)}</strong></span>
+                <span style={{fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"5px 12px",borderRadius:8}}>🔖 CMV: <strong>{fR(custoUnitLote)}/{insOut2?.unidade}</strong></span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+
+    {/* Histórico de lotes */}
+    <Card title={`📋 Histórico de Lotes (${lotesManuf.length})`}>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
+        <thead><tr>{["Data","Insumo Produzido","Qtd. Produzida","CMV/un","Custo Total","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <tbody>
+          {!lotesManuf.length&&<tr><td colSpan={6} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:28}}>Nenhum lote registrado.</td></tr>}
+          {[...lotesManuf].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(l=>{
+            const rc=receitasManuf.find(rc=>rc.id===l.receitaId);
+            const iOut=rc?idef.find(i=>i.id===rc.insumoId):null;
+            return(
+              <tr key={l.id}>
+                <td style={S.td}>{l.data||"—"}</td>
+                <td style={{...S.td,fontWeight:600,color:"#7c3aed"}}>🔧 {iOut?.nome||"—"}</td>
+                <td style={S.td}><strong>{(+l.qtdProduzida).toFixed(3)}</strong> {iOut?.unidade}</td>
+                <td style={{...S.td,color:"#059669",fontWeight:600}}>{fR(l.custoUnit)}/{iOut?.unidade}</td>
+                <td style={{...S.td,fontWeight:700,color:"#1d4ed8"}}>{fR(l.custoUnit*l.qtdProduzida)}</td>
+                <td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>removerLote(l.id)}>🗑️</button></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
+  </>);
+}
+
 function EstoqueTab({idefComCusto,entradas,setEntradas}){
   const totalValor=idefComCusto.reduce((s,i)=>s+Math.max(0,i.estoque)*i.custMedio,0);
   const [editando,setEditando]=useState(null); // {id, valor}
@@ -607,9 +862,10 @@ function EstoqueTab({idefComCusto,entradas,setEntradas}){
   </>);
 }
 
-function FichasTab({fichas,fichasCalc,setFichas,idef,custMedioFn}){
+function FichasTab({fichas,fichasCalc,setFichas,idef,custMedioFn,receitasManuf}){
   const blank={nome:"",ings:[]};const [f,setF]=useState(blank);const [eid,setEid]=useState(null);
   const [nIng,setNIng]=useState({iid:"",qtd:"",un:""});
+  const idsManuOut=new Set((receitasManuf||[]).map(rc=>rc.insumoId));
   function handleIns(iid){const ins=idef.find(i=>i.id===iid);setNIng({iid,qtd:"",un:ins?ins.unidade:""});}
   function custoIng(ing){const ins=idef.find(i=>i.id===ing.iid);if(!ins)return 0;return custMedioFn(ing.iid)*cvt(ing.qtd,ing.un||ins.unidade,ins.unidade);}
   const custoF=f.ings.reduce((s,i)=>s+custoIng(i),0);
@@ -629,12 +885,19 @@ function FichasTab({fichas,fichasCalc,setFichas,idef,custMedioFn}){
         <>
           <div style={{background:"var(--card2)",border:"1px solid var(--border3)",borderRadius:10,padding:14,marginBottom:12}}>
             <G cols="2.5fr 1fr 1fr auto" gap={8} mb={0}>
-              <div><Lbl s="Insumo"/><select style={S.inp} value={nIng.iid} onChange={e=>handleIns(e.target.value)}><option value="">Selecione...</option>{idef.map(i=>{const c=custMedioFn(i.id);return<option key={i.id} value={i.id}>{i.nome} ({i.unidade}){c>0?" → CM: "+fR(c)+"/"+i.unidade:" → sem compras"}</option>;})}</select></div>
+              <div>
+                <Lbl s="Insumo (🔧 = manufaturado)"/>
+                <select style={S.inp} value={nIng.iid} onChange={e=>handleIns(e.target.value)}>
+                  <option value="">Selecione...</option>
+                  {idef.map(i=>{const c=custMedioFn(i.id);const isM=idsManuOut.has(i.id);return<option key={i.id} value={i.id}>{isM?"🔧 ":""}{i.nome} ({i.unidade}){c>0?" → CM: "+fR(c)+"/"+i.unidade:" → sem CM"}</option>;})}
+                </select>
+              </div>
               <div><Lbl s="Quantidade"/><input style={S.inp} type="number" step="0.001" min="0" placeholder="Ex: 300" value={nIng.qtd} disabled={!nIng.iid} onChange={e=>setNIng({...nIng,qtd:e.target.value})}/></div>
               <div><Lbl s="Unidade"/><select style={{...S.inp,background:!nIng.iid?"var(--card2)":"var(--inp)"}} value={nIng.un} disabled={!nIng.iid} onChange={e=>setNIng({...nIng,un:e.target.value})}><option value="">—</option>{unOpts.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
               <div style={{display:"flex",alignItems:"flex-end"}}><button style={S.btn} onClick={addIng}>+ Add</button></div>
             </G>
             {prev!==null&&<div style={{marginTop:10,fontSize:13,color:"#7c3aed",background:"var(--accent-soft)",padding:"5px 12px",borderRadius:8,display:"inline-flex",gap:8,flexWrap:"wrap"}}>
+              {idsManuOut.has(nIng.iid)&&<span style={{background:"rgba(124,58,237,.15)",padding:"1px 8px",borderRadius:20,fontSize:11}}>🔧 Manufaturado</span>}
               <span>{nIng.qtd} {nIng.un}{nIng.un!==insAt?.unidade&&<span style={{color:"var(--text3)"}}> = {cvt(+nIng.qtd,nIng.un,insAt.unidade).toFixed(4)} {insAt?.unidade}</span>}</span>
               <span>· CM: <strong>{fR(custMedioFn(nIng.iid))}/{insAt?.unidade}</strong></span>
               <span>→ Custo: <strong>{fR(prev)}</strong></span>
@@ -644,8 +907,8 @@ function FichasTab({fichas,fichasCalc,setFichas,idef,custMedioFn}){
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,marginBottom:10}}>
               <thead><tr>{["Insumo","Qtd.","Un.","Qtd. convertida","Custo Médio","Custo",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
               <tbody>
-                {f.ings.map(ing=>{const i2=idef.find(i=>i.id===ing.iid);const qc=i2?cvt(ing.qtd,ing.un||i2.unidade,i2.unidade):0;const sc=ing.un&&ing.un!==i2?.unidade;const c2=custMedioFn(ing.iid);return(
-                  <tr key={ing.id}><td style={S.td}>{i2?.nome||"—"}</td><td style={{...S.td,fontWeight:600}}>{ing.qtd} <span style={{color:"#7c3aed"}}>{ing.un||i2?.unidade}</span></td><td style={{...S.td,color:"#7c3aed"}}>{ing.un||i2?.unidade}</td><td style={{...S.td,color:"var(--text4)",fontSize:12}}>{sc?`${qc.toFixed(4)} ${i2?.unidade}`:"—"}</td><td style={S.td}>{c2>0?`${fR(c2)}/${i2?.unidade}`:<span style={{color:"#ef4444",fontSize:12}}>Sem compras</span>}</td><td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>{fR(custoIng(ing))}</td><td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>setF({...f,ings:f.ings.filter(i=>i.id!==ing.id)})}>🗑️</button></td></tr>
+                {f.ings.map(ing=>{const i2=idef.find(i=>i.id===ing.iid);const qc=i2?cvt(ing.qtd,ing.un||i2.unidade,i2.unidade):0;const sc=ing.un&&ing.un!==i2?.unidade;const c2=custMedioFn(ing.iid);const isM=idsManuOut.has(ing.iid);return(
+                  <tr key={ing.id}><td style={S.td}>{isM&&<span style={{color:"#7c3aed",marginRight:4}}>🔧</span>}{i2?.nome||"—"}</td><td style={{...S.td,fontWeight:600}}>{ing.qtd} <span style={{color:"#7c3aed"}}>{ing.un||i2?.unidade}</span></td><td style={{...S.td,color:"#7c3aed"}}>{ing.un||i2?.unidade}</td><td style={{...S.td,color:"var(--text4)",fontSize:12}}>{sc?`${qc.toFixed(4)} ${i2?.unidade}`:"—"}</td><td style={S.td}>{c2>0?`${fR(c2)}/${i2?.unidade}`:<span style={{color:"#ef4444",fontSize:12}}>Sem CM</span>}</td><td style={{...S.td,fontWeight:700,color:"#7c3aed"}}>{fR(custoIng(ing))}</td><td style={S.td}><button style={{...S.bsm,color:"#ef4444"}} onClick={()=>setF({...f,ings:f.ings.filter(i=>i.id!==ing.id)})}>🗑️</button></td></tr>
                 );})}
                 <tr style={{background:"var(--card2)"}}><td colSpan={5} style={{...S.td,fontWeight:700,textAlign:"right",color:"#7c3aed"}}>Custo Total Unitário:</td><td style={{...S.td,fontWeight:700,color:"#7c3aed",fontSize:16}}>{fR(custoF)}</td><td style={S.td}/></tr>
               </tbody>
@@ -2103,6 +2366,8 @@ export default function App(){
   const [producoes,setProducoes]=useState(()=>lsGet("ac4_prod",[]));
   const [pedidos,setPedidos]    =useState(()=>lsGet("ac4_ped",[]));
   const [vendas,setVendas]      =useState(()=>lsGet("ac4_ven",[]));
+  const [receitasManuf,setReceitasManuf]=useState(()=>lsGet("ac4_rmanuf",[]));
+  const [lotesManuf,setLotesManuf]      =useState(()=>lsGet("ac4_lmanuf",[]));
 
   useEffect(()=>{const s=document.createElement("style");s.id="ng-theme";s.textContent=CSS_VARS;document.head.appendChild(s);return()=>s.remove();},[]);
   useEffect(()=>{document.documentElement.setAttribute("data-theme",dark?"dark":"light");lsSet("nagarrafa-theme",dark?"dark":"light");},[dark]);
@@ -2117,41 +2382,48 @@ export default function App(){
   useEffect(()=>{lsSet("ac4_prod", producoes);},[producoes]);
   useEffect(()=>{lsSet("ac4_ped",  pedidos);},[pedidos]);
   useEffect(()=>{lsSet("ac4_ven",  vendas);},[vendas]);
+  useEffect(()=>{lsSet("ac4_rmanuf",receitasManuf);},[receitasManuf]);
+  useEffect(()=>{lsSet("ac4_lmanuf",lotesManuf);},[lotesManuf]);
 
   const flatEnt=flatEntradas(entradas);
   function custMedioFn(iid){const es=flatEnt.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
-  function estoqueInsumoFn(iid){const ins=idef.find(i=>i.id===iid);if(!ins)return 0;const tE=flatEnt.filter(e=>e.insumoId===iid).reduce((s,e)=>s+e.qtd,0);const tC=producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0);return tE-tC;}
+  function estoqueInsumoFn(iid){const ins=idef.find(i=>i.id===iid);if(!ins)return 0;const tE=flatEnt.filter(e=>e.insumoId===iid).reduce((s,e)=>s+e.qtd,0);const tCProd=producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0);const tCManuf=lotesManuf.reduce((s,lote)=>{const m=(lote.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+m.qtd;},0);return tE-tCProd-tCManuf;}
   function estoqueProdutoFn(fichaId){
     const p=producoes.filter(p=>p.fichaId===fichaId).reduce((s,p)=>s+p.qtdProduzida,0);
     const v=vendas.reduce((s,v)=>s+getItems(v).filter(i=>i.fichaId===fichaId).reduce((ss,i)=>ss+i.qtd,0),0);
     return p-v;
   }
-  const idefComCusto=idef.map(ins=>({...ins,custMedio:custMedioFn(ins.id),estoque:estoqueInsumoFn(ins.id),totalEntradas:flatEnt.filter(e=>e.insumoId===ins.id).reduce((s,e)=>s+e.qtd,0),totalConsumido:producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===ins.id);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0)}));
+  const idefComCusto=idef.map(ins=>({...ins,custMedio:custMedioFn(ins.id),estoque:estoqueInsumoFn(ins.id),totalEntradas:flatEnt.filter(e=>e.insumoId===ins.id).reduce((s,e)=>s+e.qtd,0),totalConsumido:producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===ins.id);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0)+lotesManuf.reduce((s,lote)=>{const m=(lote.ings||[]).find(i=>i.iid===ins.id);return s+(m?m.qtd:0);},0)}));
   const fichasCalc=fichas.map(f=>({...f,custo:(f.ings||[]).reduce((s,ing)=>{const ins=idef.find(i=>i.id===ing.iid);if(!ins)return s;return s+custMedioFn(ing.iid)*cvt(ing.qtd,ing.un||ins.unidade,ins.unidade);},0)}));
   function getPreco(fid){if(precos[fid]!=null)return precos[fid];const f=fichasCalc.find(p=>p.id===fid),m=+(margens[fid]??40);return f&&m<100?f.custo/(1-m/100):0;}
 
-  const recBruta=vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>ss+i.qtd*getPreco(i.fichaId),0),0);
+  const recBruta=vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>ss+i.qtd*getPreco(i.fichaId),0),0)
+                +vendas.reduce((s,v)=>s+(v.teleValor||0),0);
   const cmv=vendas.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>{const f=fichasCalc.find(p=>p.id===i.fichaId);return ss+(f?i.qtd*f.custo:0);},0),0);
-  const lucBruto=recBruta-cmv,totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0),lucOp=lucBruto-totDesp;
+  const totEmb=vendas.reduce((s,v)=>s+(v.embalagemCusto||0),0);
+  const totDesc=vendas.reduce((s,v)=>s+(v.desconto||0),0);
+  const totTele=vendas.reduce((s,v)=>s+(v.teleValor||0),0);
+  const lucBruto=recBruta-cmv-totEmb-totDesc-totTele,totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0),lucOp=lucBruto-totDesp;
 
   const TAB_DEFS=[
     {idx:0, icon:"🧂", label:"Insumos"},
     {idx:1, icon:"📥", label:"Compras"},
-    {idx:2, icon:"📦", label:"Estoque"},
-    {idx:3, icon:"📋", label:"Fichas Técnicas"},
-    {idx:4, icon:"💰", label:"Preços"},
-    {idx:5, icon:"🏭", label:"Produção"},
-    {idx:6, icon:"📝", label:"Pedidos"},
-    {idx:7, icon:"🛒", label:"Vendas"},
-    {idx:8, icon:"🏢", label:"Despesas"},
-    {idx:9, icon:"📊", label:"DRE"},
-    {idx:10,icon:"🎯", label:"Dashboard"},
-    {idx:11,icon:"👥", label:"Usuários"},
-    {idx:12,icon:"🛍️", label:"Lista de Compras"},
-    {idx:13,icon:"👤", label:"Clientes"},
-    {idx:14,icon:"💵", label:"Fluxo de Caixa"},
+    {idx:2, icon:"🔧", label:"Manufatura"},
+    {idx:3, icon:"📦", label:"Estoque"},
+    {idx:4, icon:"📋", label:"Fichas Técnicas"},
+    {idx:5, icon:"💰", label:"Preços"},
+    {idx:6, icon:"🏭", label:"Produção"},
+    {idx:7, icon:"📝", label:"Pedidos"},
+    {idx:8, icon:"🛒", label:"Vendas"},
+    {idx:9, icon:"🏢", label:"Despesas"},
+    {idx:10,icon:"📊", label:"DRE"},
+    {idx:11,icon:"🎯", label:"Dashboard"},
+    {idx:12,icon:"👥", label:"Usuários"},
+    {idx:13,icon:"🛍️", label:"Lista de Compras"},
+    {idx:14,icon:"👤", label:"Clientes"},
+    {idx:15,icon:"💵", label:"Fluxo de Caixa"},
   ];
-  const ALL_BADGES=[idef.length,entradas.length,null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length,null,null,null];
+  const ALL_BADGES=[idef.length,entradas.length,lotesManuf.length||null,fichas.length,null,producoes.length,pedidos.filter(p=>p.status==="Pendente").length,vendas.length,despesas.length,null,null,usuarios.length,null,null,null,null];
 
   if(!currentUser)return <LoginScreen usuarios={usuarios} onLogin={u=>{setCurrentUser(u);setTab(PERMS[u.role].tabs[0]);}}/>;
 
@@ -2244,19 +2516,20 @@ export default function App(){
         <div style={{flex:1,padding:"24px 24px 48px"}}>
           {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
           {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef} custMedioFn={custMedioFn}/>}
-          {tab===2  && <EstoqueTab idefComCusto={idefComCusto} entradas={entradas} setEntradas={setEntradas}/>}
-          {tab===3  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn}/>}
-          {tab===4  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
-          {tab===5  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
-          {tab===6  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido} idef={idef} custMedioFn={custMedioFn}/>}
-          {tab===7  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} idef={idef}/>}
-          {tab===8  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
-          {tab===9  && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
-          {tab===10 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
-          {tab===11 && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} currentUser={currentUser}/>}
-          {tab===12 && <ListaComprasTab fichasCalc={fichasCalc} idef={idef} setIdef={setIdef} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
-          {tab===13 && <ClientesTab pedidos={pedidos} fichasCalc={fichasCalc} getPreco={getPreco}/>}
-          {tab===14 && <FluxoCaixaTab entradas={entradas} vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} idef={idef}/>}
+          {tab===2  && <ManufaturaTab receitasManuf={receitasManuf} setReceitasManuf={setReceitasManuf} lotesManuf={lotesManuf} setLotesManuf={setLotesManuf} idef={idef} entradas={entradas} setEntradas={setEntradas} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
+          {tab===3  && <EstoqueTab idefComCusto={idefComCusto} entradas={entradas} setEntradas={setEntradas}/>}
+          {tab===4  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn} receitasManuf={receitasManuf}/>}
+          {tab===5  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
+          {tab===6  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
+          {tab===7  && <PedidosTab pedidos={pedidos} setPedidos={setPedidos} fichasCalc={fichasCalc} getPreco={getPreco} setVendas={setVendas} vendas={vendas} estoqueProdutoFn={estoqueProdutoFn} canConfirmar={perm.canConfirmarPedido} idef={idef} custMedioFn={custMedioFn}/>}
+          {tab===8  && <VendasTab vendas={vendas} setVendas={setVendas} fichasCalc={fichasCalc} getPreco={getPreco} idef={idef}/>}
+          {tab===9  && <DespesasTab despesas={despesas} setDespesas={setDespesas}/>}
+          {tab===10 && <DRETab vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} despesas={despesas}/>}
+          {tab===11 && <DashboardTab fichasCalc={fichasCalc} vendas={vendas} margens={margens} getPreco={getPreco} recBruta={recBruta} lucOp={lucOp} totDesp={totDesp} despesas={despesas}/>}
+          {tab===12 && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} currentUser={currentUser}/>}
+          {tab===13 && <ListaComprasTab fichasCalc={fichasCalc} idef={idef} setIdef={setIdef} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
+          {tab===14 && <ClientesTab pedidos={pedidos} fichasCalc={fichasCalc} getPreco={getPreco}/>}
+          {tab===15 && <FluxoCaixaTab entradas={entradas} vendas={vendas} fichasCalc={fichasCalc} getPreco={getPreco} idef={idef}/>}
         </div>
       </div>
     </div>
