@@ -1182,7 +1182,8 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
   const cmv=vf.reduce((s,v)=>s+getItems(v).reduce((ss,i)=>{const f=fichasCalc.find(p=>p.id===i.fichaId);return ss+(f?i.qtd*f.custo:0);},0),0);
   const totEmb=vf.reduce((s,v)=>s+(v.embalagemCusto||0),0);
   const totDesc=vf.reduce((s,v)=>s+(v.desconto||0),0);
-  const lucBruto=recTotal-cmv-totEmb-totDesc;
+  // Tele entrega: entra como receita e sai como custo direto (repasse ao entregador)
+  const lucBruto=recTotal-cmv-totEmb-totDesc-recTele;
   const totDesp=despesas.reduce((s,d)=>s+(+d.valor||0),0);
   const lucOp=lucBruto-totDesp;
   const mbPct=recTotal>0?lucBruto/recTotal*100:0;
@@ -1190,7 +1191,20 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
   const label=filtroAtivo?`${MESES[mes-1]}/${ano}`:"Todo o período";
   function pct(v){return recTotal>0?fP(v/recTotal*100):"—";}
   function exportCSV(){
-    const rows=[["Período",label,""],["Descrição","Valor (R$)","% Receita Total"],["FATURAMENTO DE PRODUTOS",recProd.toFixed(2),pct(recProd)],...recPorProd.map(p=>[`  ↳ ${p.nome} (${p.qtd} un)`,p.rec.toFixed(2),pct(p.rec)]),recTele>0?["RECEITA TELE ENTREGA",recTele.toFixed(2),pct(recTele)]:[],...[["RECEITA TOTAL",recTotal.toFixed(2),"100.0%"],["(-) CMV",(-cmv).toFixed(2),pct(-cmv)]],...(totEmb>0?[["(-) Embalagens",(-totEmb).toFixed(2),pct(-totEmb)]]:[]),...(totDesc>0?[["(-) Descontos",(-totDesc).toFixed(2),pct(-totDesc)]]:[]),["(=) LUCRO BRUTO",lucBruto.toFixed(2),fP(mbPct)],...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),pct(-d.valor)]),["(=) LUCRO OPERACIONAL",lucOp.toFixed(2),fP(moPct)]].filter(r=>r.length>0);
+    const rows=[
+      ["Período",label,""],["Descrição","Valor (R$)","% Receita Total"],
+      ["FATURAMENTO DE PRODUTOS",recProd.toFixed(2),pct(recProd)],
+      ...recPorProd.map(p=>[`  ↳ ${p.nome} (${p.qtd} un)`,p.rec.toFixed(2),pct(p.rec)]),
+      recTele>0?["RECEITA TELE ENTREGA",recTele.toFixed(2),pct(recTele)]:[],
+      ["RECEITA TOTAL",recTotal.toFixed(2),"100.0%"],
+      ["(-) CMV",(-cmv).toFixed(2),pct(-cmv)],
+      ...(totEmb>0?[["(-) Embalagens",(-totEmb).toFixed(2),pct(-totEmb)]]:[]),
+      ...(totDesc>0?[["(-) Descontos",(-totDesc).toFixed(2),pct(-totDesc)]]:[]),
+      ...(recTele>0?[["(-) Custos de Entrega (Tele)",(-recTele).toFixed(2),pct(-recTele)]]:[]),
+      ["(=) LUCRO BRUTO",lucBruto.toFixed(2),fP(mbPct)],
+      ...despesas.map(d=>[d.descricao,(-d.valor).toFixed(2),pct(-d.valor)]),
+      ["(=) LUCRO OPERACIONAL",lucOp.toFixed(2),fP(moPct)],
+    ].filter(r=>r.length>0);
     const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n"));a.download=`DRE_NaGarrafa_${label.replace("/","_")}.csv`;a.click();
   }
   function DreRow({lbl,val,indent,bold,color,bg,sep}){indent=indent||0;bold=bold||false;bg=bg||"transparent";sep=sep||false;return(<tr style={{background:bg,borderTop:sep?"2px solid var(--border3)":"none"}}><td style={{...S.td,paddingLeft:16+indent*18,fontWeight:bold?700:400,color:color||"var(--text)",fontSize:bold?15:14}}>{lbl}</td><td style={{...S.td,textAlign:"right",fontWeight:bold?700:500,color:color||"var(--text)",fontSize:bold?15:14}}>{fR(val)}</td><td style={{...S.td,textAlign:"right",fontSize:13,color:"var(--text4)"}}>{pct(val)}</td></tr>);}
@@ -1224,6 +1238,7 @@ function DRETab({vendas,fichasCalc,getPreco,despesas}){
           <DreRow lbl="(-) CMV — Custo das Mercadorias Vendidas" val={-cmv} indent={1} color="#ef4444"/>
           {totEmb>0&&<DreRow lbl="(-) Custos de Embalagem" val={-totEmb} indent={1} color="#ef4444"/>}
           {totDesc>0&&<DreRow lbl="(-) Descontos Concedidos" val={-totDesc} indent={1} color="#ef4444"/>}
+          {recTele>0&&<DreRow lbl="(-) Custos de Entrega (Tele)" val={-recTele} indent={1} color="#ef4444"/>}
           <DreRow lbl="(=) LUCRO BRUTO" val={lucBruto} bold bg="var(--card2)" sep color={lucBruto>=0?"#7c3aed":"#ef4444"}/>
           <DreRow lbl="(-) DESPESAS OPERACIONAIS" val={-totDesp} bold color="#d97706" sep/>
           {despesas.map(d=><DreRow key={d.id} lbl={`${d.tipo==="Fixa"?"🔵":"🟡"} ${d.descricao}`} val={-d.valor} indent={1}/>)}
