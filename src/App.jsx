@@ -143,9 +143,9 @@ function UsuariosTab({usuarios,setUsuarios,currentUser}){
   </>);
 }
 
-// ── INSUMOS — agora com campo capacidadeUnitaria ──────────────────────────
+// ── INSUMOS — agora com campo capacidadeUnitaria e custoUnitario ──────────────────────────
 function InsumosDefTab({idef,setIdef}){
-  const blank={nome:"",unidade:"kg",capacidadeUnitaria:""};
+  const blank={nome:"",unidade:"kg",capacidadeUnitaria:"",custoUnitario:""};
   const [f,setF]=useState(blank);const [eid,setEid]=useState(null);
   function salvar(){
     if(!f.nome.trim())return alert("Informe o nome.");
@@ -153,7 +153,8 @@ function InsumosDefTab({idef,setIdef}){
       id:eid||uid(),
       nome:f.nome.trim(),
       unidade:f.unidade,
-      capacidadeUnitaria:f.capacidadeUnitaria&&+f.capacidadeUnitaria>0?+f.capacidadeUnitaria:null
+      capacidadeUnitaria:f.capacidadeUnitaria&&+f.capacidadeUnitaria>0?+f.capacidadeUnitaria:null,
+      custoUnitario:f.custoUnitario&&+f.custoUnitario>0?+f.custoUnitario:null,
     };
     setIdef(eid?idef.map(i=>i.id===eid?it:i):[...idef,it]);
     setF(blank);setEid(null);
@@ -161,9 +162,9 @@ function InsumosDefTab({idef,setIdef}){
   return(<>
     <Card title="➕ Cadastrar Insumo">
       <p style={{margin:"0 0 14px",fontSize:13,color:"var(--text3)"}}>
-        Cadastre os ingredientes usados na produção. A <strong>capacidade unitária</strong> representa o tamanho da embalagem comercial (ex: 1 kg por pacote) — usada para sugerir quantidades de compra sem sobra.
+        Cadastre os ingredientes usados na produção. O <strong>custo padrão</strong> é usado como fallback quando não há compras registradas (mantém o CMV dos produtos estável mesmo com estoque zerado).
       </p>
-      <G cols="2.5fr 1fr 1fr auto">
+      <G cols="2fr 1fr 1fr 1fr auto">
         <div><Lbl s="Nome *"/><input style={S.inp} placeholder="Ex: Polpa de Açaí" value={f.nome} onChange={e=>setF({...f,nome:e.target.value})}/></div>
         <div><Lbl s="Unidade"/><select style={S.inp} value={f.unidade} onChange={e=>setF({...f,unidade:e.target.value})}>{UNITS.map(u=><option key={u}>{u}</option>)}</select></div>
         <div>
@@ -173,18 +174,25 @@ function InsumosDefTab({idef,setIdef}){
             <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:12,color:"var(--text4)",pointerEvents:"none"}}>{f.unidade}</span>
           </div>
         </div>
+        <div>
+          <Lbl s="💰 Custo padrão (fallback)"/>
+          <div style={{position:"relative"}}>
+            <input style={{...S.inp,paddingRight:36}} type="number" step="0.01" min="0" placeholder="R$/un" value={f.custoUnitario} onChange={e=>setF({...f,custoUnitario:e.target.value})}/>
+            <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:11,color:"var(--text4)",pointerEvents:"none"}}>/{f.unidade}</span>
+          </div>
+        </div>
         <div style={{display:"flex",alignItems:"flex-end",gap:6}}>
           {eid&&<button style={S.btn2} onClick={()=>{setF(blank);setEid(null)}}>✕</button>}
           <button style={S.btn} onClick={salvar}>{eid?"✓ Atualizar":"+ Adicionar"}</button>
         </div>
       </G>
-      <p style={{margin:"8px 0 0",fontSize:12,color:"var(--text4)"}}>💡 Dica: se o açaí vem em pacotes de 1 kg, informe 1. Se vem em embalagens de 500 g, informe 0.5 (em kg) ou 500 (em g).</p>
+      <p style={{margin:"8px 0 0",fontSize:12,color:"var(--text4)"}}>💡 O custo padrão só é usado quando não há compras registradas para o insumo. Quando há compras, o CMV ponderado prevalece automaticamente.</p>
     </Card>
     <Card title={`📋 Insumos (${idef.length})`}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
-        <thead><tr>{["Insumo","Unidade","Cap. Unitária (embalagem)","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Insumo","Unidade","Cap. Unitária","Custo Padrão","Ações"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {!idef.length&&<tr><td colSpan={4} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum insumo cadastrado. Adicione acima 👆</td></tr>}
+          {!idef.length&&<tr><td colSpan={5} style={{...S.td,textAlign:"center",color:"var(--text4)",padding:32}}>Nenhum insumo cadastrado. Adicione acima 👆</td></tr>}
           {idef.map(i=>(
             <tr key={i.id}>
               <td style={{...S.td,fontWeight:500}}>{i.nome}</td>
@@ -192,10 +200,15 @@ function InsumosDefTab({idef,setIdef}){
               <td style={S.td}>
                 {i.capacidadeUnitaria
                   ? <span style={{background:"var(--accent-soft)",color:"#7c3aed",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{i.capacidadeUnitaria} {i.unidade}/emb.</span>
-                  : <span style={{color:"var(--text4)",fontSize:12}}>— não definida</span>}
+                  : <span style={{color:"var(--text4)",fontSize:12}}>—</span>}
               </td>
               <td style={S.td}>
-                <button style={S.bsm} onClick={()=>{setF({nome:i.nome,unidade:i.unidade,capacidadeUnitaria:i.capacidadeUnitaria||""});setEid(i.id)}}>✏️</button>
+                {i.custoUnitario
+                  ? <span style={{background:"rgba(5,150,105,.08)",color:"#059669",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{fR(i.custoUnitario)}/{i.unidade}</span>
+                  : <span style={{color:"var(--text4)",fontSize:12}}>—</span>}
+              </td>
+              <td style={S.td}>
+                <button style={S.bsm} onClick={()=>{setF({nome:i.nome,unidade:i.unidade,capacidadeUnitaria:i.capacidadeUnitaria||"",custoUnitario:i.custoUnitario||""});setEid(i.id)}}>✏️</button>
                 <button style={{...S.bsm,color:"#ef4444",marginLeft:6}} onClick={()=>{if(window.confirm("Remover?"))setIdef(idef.filter(x=>x.id!==i.id))}}>🗑️</button>
               </td>
             </tr>
@@ -296,8 +309,10 @@ function ComprasTab({entradas,setEntradas,idef,custMedioFn}){
     setH({...blankH,data:h.data,pagamento:h.pagamento});
   }
 
-  // Normaliza histórico: novas compras (items[]) e antigas (item direto)
-  const comprasHist=[...entradas].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(e=>{
+  // Normaliza histórico: novas compras (items[]) e antigas (item direto), excluindo ajustes e manufaturas
+  const comprasHist=[...entradas]
+    .filter(e=>!e.tipo) // exclui tipo:"ajuste", tipo:"manufatura"
+    .sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(e=>{
     if(e.items){
       return{id:e.id,data:e.data,pagamento:e.pagamento,fornecedor:e.fornecedor||"—",
         items:e.items,total:e.totalCompra||e.items.reduce((s,i)=>s+i.custoTotal,0)};
@@ -776,7 +791,7 @@ function ManufaturaTab({receitasManuf,setReceitasManuf,lotesManuf,setLotesManuf,
   </>);
 }
 
-function EstoqueTab({idefComCusto,entradas,setEntradas}){
+function EstoqueTab({idefComCusto,entradas,setEntradas,flatEnt}){
   const totalValor=idefComCusto.reduce((s,i)=>s+Math.max(0,i.estoque)*i.custMedio,0);
   const [editando,setEditando]=useState(null); // {id, valor}
   const today=new Date().toISOString().slice(0,10);
@@ -843,7 +858,15 @@ function EstoqueTab({idefComCusto,entradas,setEntradas}){
                     </span>
                   )}
                 </td>
-                <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>{i.custMedio>0?`${fR(i.custMedio)}/${i.unidade}`:<span style={{color:"var(--text4)",fontSize:12}}>Sem compras</span>}</td>
+                <td style={{...S.td,color:"#7c3aed",fontWeight:700}}>
+                  {i.custMedio>0?(
+                    <>
+                      <span>{fR(i.custMedio)}/{i.unidade}</span>
+                      {i.custoUnitario&&flatEnt.filter(e=>e.insumoId===i.id&&e.tipo!=="ajuste").length===0&&
+                        <span style={{fontSize:10,color:"#d97706",background:"rgba(245,158,11,.1)",padding:"1px 6px",borderRadius:10,marginLeft:6}}>padrão</span>}
+                    </>
+                  ):<span style={{color:"var(--text4)",fontSize:12}}>Sem compras</span>}
+                </td>
                 <td style={{...S.td,fontWeight:600}}>{fR(Math.max(0,i.estoque)*i.custMedio)}</td>
                 <td style={S.td}>{neg?<Pill label="❌ Negativo" color="#991b1b" bg="#fee2e2"/>:bx?<Pill label="⚠️ Baixo" color="#92400e" bg="#fef3c7"/>:<Pill label="✅ OK" color="#065f46" bg="#d1fae5"/>}</td>
                 <td style={S.td}>
@@ -2386,7 +2409,14 @@ export default function App(){
   useEffect(()=>{lsSet("ac4_lmanuf",lotesManuf);},[lotesManuf]);
 
   const flatEnt=flatEntradas(entradas);
-  function custMedioFn(iid){const es=flatEnt.filter(e=>e.insumoId===iid);const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);return tQ>0?tC/tQ:0;}
+  // CM: usa apenas entradas com custo real (exclui tipo:"ajuste" que têm custoTotal=0 e distorcem o CM)
+  function custMedioFn(iid){
+    const es=flatEnt.filter(e=>e.insumoId===iid&&e.tipo!=="ajuste");
+    const tQ=es.reduce((s,e)=>s+e.qtd,0),tC=es.reduce((s,e)=>s+e.custoTotal,0);
+    if(tQ>0&&tC>0)return tC/tQ;
+    // Fallback: custo padrão definido manualmente no cadastro do insumo
+    return idef.find(i=>i.id===iid)?.custoUnitario||0;
+  }
   function estoqueInsumoFn(iid){const ins=idef.find(i=>i.id===iid);if(!ins)return 0;const tE=flatEnt.filter(e=>e.insumoId===iid).reduce((s,e)=>s+e.qtd,0);const tCProd=producoes.reduce((s,prod)=>{const fc=fichas.find(f=>f.id===prod.fichaId);if(!fc)return s;const m=(fc.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+cvt(m.qtd,m.un||ins.unidade,ins.unidade)*prod.qtdProduzida;},0);const tCManuf=lotesManuf.reduce((s,lote)=>{const m=(lote.ings||[]).find(i=>i.iid===iid);if(!m)return s;return s+m.qtd;},0);return tE-tCProd-tCManuf;}
   function estoqueProdutoFn(fichaId){
     const p=producoes.filter(p=>p.fichaId===fichaId).reduce((s,p)=>s+p.qtdProduzida,0);
@@ -2517,7 +2547,7 @@ export default function App(){
           {tab===0  && <InsumosDefTab idef={idef} setIdef={setIdef}/>}
           {tab===1  && <ComprasTab entradas={entradas} setEntradas={setEntradas} idef={idef} custMedioFn={custMedioFn}/>}
           {tab===2  && <ManufaturaTab receitasManuf={receitasManuf} setReceitasManuf={setReceitasManuf} lotesManuf={lotesManuf} setLotesManuf={setLotesManuf} idef={idef} entradas={entradas} setEntradas={setEntradas} estoqueInsumoFn={estoqueInsumoFn} custMedioFn={custMedioFn}/>}
-          {tab===3  && <EstoqueTab idefComCusto={idefComCusto} entradas={entradas} setEntradas={setEntradas}/>}
+          {tab===3  && <EstoqueTab idefComCusto={idefComCusto} entradas={entradas} setEntradas={setEntradas} flatEnt={flatEnt}/>}
           {tab===4  && <FichasTab fichas={fichas} fichasCalc={fichasCalc} setFichas={setFichas} idef={idef} custMedioFn={custMedioFn} receitasManuf={receitasManuf}/>}
           {tab===5  && <PrecosTab fichasCalc={fichasCalc} margens={margens} sm={setMargens} getPreco={getPreco} precos={precos} sp={setPrecos} canEdit={perm.editPrecos}/>}
           {tab===6  && <ProducaoTab producoes={producoes} setProducoes={setProducoes} fichasCalc={fichasCalc} idef={idef} estoqueInsumoFn={estoqueInsumoFn} estoqueProdutoFn={estoqueProdutoFn}/>}
